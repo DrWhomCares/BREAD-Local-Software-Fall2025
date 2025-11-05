@@ -21,10 +21,10 @@ long lastThermoRead = 0;
 long lastSerialPrint = 0;
 
 //auto tuning variables
-uint8_t checkOsc = 0;
-uint8_t peak = 0;
+int checkOsc = 0;
+int peak = 0;
 hw_timer_t *timer = NULL;
-float bio_auto[6] = {0,0,0,0,0,0}; // {maxTemp, prevTemp, prevTime, Peak1, prevDeriv, setpoint}
+float bio_auto[5] = {0,0,0,0,0}; // {maxTemp, prevTemp, prevTime, Peak1, prevDeriv}
 
 //Edit these offsets to calibrate thermocouples as needed
 double thermo1_offset = 4.0;
@@ -155,6 +155,7 @@ void loop() {
   measureThermocouples();
   if(!E_STOP)
   {
+    
     setPIDTunings();
     // assign thermocouple readings to relay inputs
     switch(RLHT.thermoSelect[0]){
@@ -188,7 +189,7 @@ void loop() {
   }
 }
 void autoTune(){
-  float tmp = bio_post_heater_pid[1][1];
+  //float tmp = 10; not a real value  
   Serial.print("Current Kp: ");
   Serial.println(tmp);
   Serial.print("time");
@@ -198,22 +199,19 @@ void autoTune(){
   Serial.print("setpoint: ");
   Serial.println(setpoint);
   Serial.println("temp bio: ");
-  for (int i = 0; i < 4; i++)
-    {
-      Serial.print(bio_thermo_val[i]);
-      Serial.print(" ");
-    }
+  
   Serial.println();
   if(bio_auto[2] == 0 && autoCheck == 1)
   {
     Serial.println("Time set");
     bio_auto[2] = time;
+    Serial.println(bio_auto[2]);
   }
 //we could just increase the gain super slowly
   if (autoCheck == 1 && time - bio_auto[2] > 20)
   {
     //((current T - previous T) / (current time - previous timee))
-    double driv = (temp - bio_auto[1])/(time - bio_auto[2]);
+    double driv = (RLHT_auto.thermo1 - bio_auto[1])/(time - bio_auto[2]);
     
     Serial.print("currentTemp: ");
     Serial.println(temp);
@@ -222,35 +220,36 @@ void autoTune(){
     Serial.print("prevDeriv: ");
     Serial.println(bio_auto[4]);
     Serial.print("setpoint: ");
-    Serial.println(setpoint);
+    Serial.println(RLHT_auto.heatSetpoint_1);
     Serial.print("Max Temp: ");
     Serial.println(bio_auto[0]);
     
     //if T is less than 2% of Setpoint and the derivative is decreasing and it isn't oscillating...
-    if ((temp < setpoint - (setpoint * 0.02)) && driv < 0.02 && checkOsc == 0)
+    if ((RLHT_auto.thermo1 < RLHT_auto.heatSetpoint_1 - (RLHT_auto.heatSetpoint_1 * 0.02)) && driv < 0.02 && checkOsc == 0)
     {
         //double Ku and send new gains
-        bio_post_heater_pid[1][1] = Ku * 2;
-        RLHTCommandPID(address, heater, bio_post_heater_pid[1][1], 0, 0);
+        RLHT_auto.Kp_1 = RLHT_auto.Kp_1 * 2;
+        //RLHTCommandPID(address, heater, bio_post_heater_pid[1][1], 0, 0);
+        relay1PID.SetTunings(RLHT_auto.Kp_1, 0, 0);
         Serial.print("Kp Change: ");
-        Serial.println(bio_post_heater_pid[1][1]); 
+        Serial.println(RLHT_auto.Kp_1); 
     }
-    else if(temp > setpoint || checkOsc == 1)
+    else if(RLHT_auto.thermo1 > RLHT_auto.heatSetpoint_1 || checkOsc == 1)
     {
       //check for oscillations
       checkOsc = 1;
       //If MaxTemp is less than current temp, set new peak 1 max and continue
-      if(bio_auto[0] < temp)
+      if(bio_auto[0] < RLHT_auto.thermo1)
       {
-        bio_auto[0] = temp;
+        bio_auto[0] = RLHT_auto.thermo1;
       }
       //If previous T is smaller than current, set new maximum T
-      else if(bio_auto[1] < temp){
+      else if(bio_auto[1] < RLHT_auto.thermo1){
         //increasing to peak 2
-        bio_auto[0] = temp;
+        bio_auto[0] = RLHT_auto.thermo1;
       }
       //If max observed T is larger than new and we have not found the first peak, set it as the first peak
-      if(bio_auto[0] > temp && peak == 0){
+      if(bio_auto[0] > RLHT_auto.thermo1 && peak == 0){
         bio_auto[3] = bio_auto[0];
         bio_auto[0] = 0;
         peak = 1;
@@ -260,7 +259,7 @@ void autoTune(){
         Serial.println("time reset");
       }
       //If max observed T is larger than new and we have found the first peak...
-      else if (bio_auto[0] > temp && peak == 1){
+      else if (bio_auto[0] > RLHT_auto.thermo1 && peak == 1){
         //Find the delta between the secondpeak-firstpeak
         float delp = bio_auto[0]-bio_auto[3];
         Serial.print("peak 1 temp: ");
@@ -269,17 +268,23 @@ void autoTune(){
         Serial.println(delp);
         //If the delta is greater than 0, change Ku
         if(delp > 0){
-          bio_post_heater_pid[1][1] = (Ku / 1.5); //or Ku - (Ku/2)
-          RLHTCommandPID(address, heater,bio_post_heater_pid[1][1],0,0);
+          RLHT_auto.Kp_1 = (RLHT_auto.Kp_1 / 1.5); //or Ku - (Ku/2)
+          //RLHTCommandPID(address, heater,bio_post_heater_pid[1][1],0,0);
+          relay1PID.SetTunings(RLHT_auto.Kp_1, 0, 0)
         }
         else{
           float time = timerReadSeconds(timer);
           //reset Command
-          RLHTCommandPID(address, heater, 0, 0, 0);
+          //RLHTCommandPID(address, heater, 0, 0, 0);
+          relay1PID.SetTunings(0,0,0)
           //add values to
-          bio_heater_auto_pid_vals[0] = 0.6*bio_post_heater_pid[1][1];
-          bio_heater_auto_pid_vals[1] = (1.2*bio_post_heater_pid[1][1])/time;
-          bio_heater_auto_pid_vals[2] = 0.075*bio_post_heater_pid[1][1]*time;
+
+          //bio_heater_auto_pid_vals[0] = 0.6*bio_post_heater_pid[1][1];
+          //bio_heater_auto_pid_vals[1] = (1.2*bio_post_heater_pid[1][1])/time;
+          //bio_heater_auto_pid_vals[2] = 0.075*bio_post_heater_pid[1][1]*time;
+          RLHT_auto.Kp_1 = 0.6*RLHT_auto.Kp_1;
+          RLHT_auto.Ki_1 = (1.2*RLHT_auto.Kp_1)/time;
+          RLHT_auto.Kd_1 = (0.075*RLHT_auto.Kp_1)*time;
           checkOsc = 0;
           autoCheck = 0;
           timerStop(timer);
@@ -291,7 +296,7 @@ void autoTune(){
     // if(bio_auto[2] != 0){
     //   bio_auto[2] = time;
     // }
-    //saving old time, temp, and dericative
+    //saving old time, temp, and derivative
     bio_auto[1] = temp;
     bio_auto[2] = time;
     bio_auto[4] = driv;
@@ -491,6 +496,7 @@ void setParametersRLHT(char *in_data)
         RLHT_auto.Ku_1 = float2.number;
         RLHT_auto.tau_1 = float3.number;
       }
+      autocheck = 1
       break;
   }
 }

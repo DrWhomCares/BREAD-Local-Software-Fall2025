@@ -546,7 +546,7 @@
             </div>
         </div>
 
-        <div id="chemreactor">
+        <div id="chemreactor"class="tabcontent">
             <!-- <h1>Chemical Deconstruction Reactor</h1> -->
             <div style="display: grid; grid-template-columns: auto auto auto auto auto auto;">
                 <div>
@@ -635,11 +635,67 @@
                 <button id="chem-thermo-tracking" onclick="setTracking('chem-thermo-tracking', 'chem-thermo-tracking-amount', 'chem-thermo-graph')">Track Data</button>        
             </div>
         </div>
+    </div>
 
-        <div id="sequencing" class="tabcontent">
-            <h2>Bioreactor Sequencing</h2>
-            <!-- Sequencing content will go here -->
-        </div>
+		<div id="sequencing"class="tabcontent">
+		    <h2>Bioreactor Sequencing</h2>
+    
+		    <!-- Testing Section -->
+		    <div style="border: 2px solid #4CAF50; padding: 20px; margin-bottom: 30px; background-color: #f9f9f9;">
+		        <h3 style="color: #4CAF50;">Testing Section</h3>
+		        <p style="color: #666; font-style: italic;">Use this section for quick testing cycles with shorter durations</p>
+        
+		        <div style="display: grid; grid-template-columns: auto auto; gap: 20px; max-width: 600px;">
+		            <div>
+		                <label><strong>Number of Cycles:</strong></label>
+		                <input type="number" id="test-num-cycles" value="3" min="1" style="width: 100px;">	
+		            </div>
+            
+		            <div>	
+		                <label><strong>Feed Pump Runtime (seconds):</strong></label>
+		                <input type="number" id="test-feed-time" value="10" min="0" style="width: 100px;">
+		                <span style="color: #666; font-size: 0.9em;"> (Step 1: Load reactor)</span>
+		            </div>
+            
+		            <div>
+		                <label><strong>Growth Wait Time (seconds):</strong></label>
+		                <input type="number" id="test-growth-time" value="60" min="0" style="width: 100px;">
+		                <span style="color: #666; font-size: 0.9em;"> (Step 2: Stirring active)</span>
+		            </div>
+            
+		            <div>
+		                <label><strong>Harvest Pump Runtime (seconds):</strong></label>
+		                <input type="number" id="test-harvest-time" value="10" min="0" style="width: 100px;">
+		                <span style="color: #666; font-size: 0.9em;"> (Step 3: Empty reactor)</span>
+		            </div>
+		        </div>
+        
+		        <div style="margin-top: 20px;">
+		            <button style="background-color: #4CAF50; color: white; padding: 10px 20px; font-size: 16px; cursor: pointer;">
+		                Start Testing Sequence
+		            </button>
+		            <button style="background-color: #f44336; color: white; padding: 10px 20px; font-size: 16px; cursor: pointer; margin-left: 10px;">
+		                Stop Sequence
+		            </button>
+		        </div>
+        
+		        <div style="margin-top: 20px; padding: 10px; background-color: #e8f5e9; border-left: 4px solid #4CAF50;">
+		            <strong>Status:</strong> <span id="test-sequence-status">Idle</span><br>
+		            <strong>Current Cycle:</strong> <span id="test-current-cycle">0</span> / <span id="test-total-cycles">0</span><br>
+		            <strong>Current Step:</strong> <span id="test-current-step">None</span><br>
+		            <strong>Time Remaining:</strong> <span id="test-time-remaining">0</span> seconds
+		        </div>
+		    </div>
+	    
+		    <!-- Practical Section -->
+		    <div style="border: 2px solid #2196F3; padding: 20px; background-color: #f9f9f9;">
+		        <h3 style="color: #2196F3;">Practical Section</h3>
+		        <p style="color: #666; font-style: italic;">Use this section for longer production cycles (hours/days)</p>
+	        
+		        <!-- Practical inputs will go here -->
+		        <p style="color: #999;">Coming soon...</p>	
+		    </div>
+		</div>
 
     <script src="js/plotly.js"></script>
     <script src="js/tabbing.js"></script>

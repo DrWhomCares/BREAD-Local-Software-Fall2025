@@ -637,21 +637,22 @@
         </div>
     </div>
 
-		<div id="sequencing"class="tabcontent">
+
+		<div id="sequencing" class="tabcontent">
 		    <h2>Bioreactor Sequencing</h2>
     
 		    <!-- Testing Section -->
-		    <div style="border: 2px solid #4CAF50; padding: 20px; margin-bottom: 30px; background-color: #f9f9f9;">
-		        <h3 style="color: #4CAF50;">Testing Section</h3>
+		    <div style="border: 2px solid #ccc; padding: 20px; margin-bottom: 30px;">
+		        <h3>Testing Section</h3>
 		        <p style="color: #666; font-style: italic;">Use this section for quick testing cycles with shorter durations</p>
-        
+	        
 		        <div style="display: grid; grid-template-columns: auto auto; gap: 20px; max-width: 600px;">
 		            <div>
 		                <label><strong>Number of Cycles:</strong></label>
-		                <input type="number" id="test-num-cycles" value="3" min="1" style="width: 100px;">	
+		                <input type="number" id="test-num-cycles" value="3" min="1" style="width: 100px;">
 		            </div>
             
-		            <div>	
+		            <div>
 		                <label><strong>Feed Pump Runtime (seconds):</strong></label>
 		                <input type="number" id="test-feed-time" value="10" min="0" style="width: 100px;">
 		                <span style="color: #666; font-size: 0.9em;"> (Step 1: Load reactor)</span>
@@ -670,32 +671,92 @@
 		            </div>
 		        </div>
         
+		        <!-- Pump Gauges -->
+		        <h4>Pump Controls</h4>
+		        <div style="display: grid; grid-template-columns: auto auto; gap: 20px; max-width: 500px;">
+		            <div>
+		                <div id="bio-pump3-gauge1"></div>
+		                <p style="margin: 5px 0; font-weight: bold;">Water Pump (Input)</p>
+		            </div>
+		            <div>
+		                <div id="bio-pump3-gauge2"></div>
+		                <p style="margin: 5px 0; font-weight: bold;">Harvest Pump (Output)</p>
+		            </div>
+		        </div>
+        
 		        <div style="margin-top: 20px;">
-		            <button style="background-color: #4CAF50; color: white; padding: 10px 20px; font-size: 16px; cursor: pointer;">
+		            <button style="background-color: #4CAF50; color: white; padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 4px;">
 		                Start Testing Sequence
 		            </button>
-		            <button style="background-color: #f44336; color: white; padding: 10px 20px; font-size: 16px; cursor: pointer; margin-left: 10px;">
+		            <button style="background-color: #f44336; color: white; padding: 10px 20px; font-size: 16px; cursor: pointer; margin-left: 10px; border: none; border-radius: 4px;">
 		                Stop Sequence
 		            </button>
 		        </div>
         
-		        <div style="margin-top: 20px; padding: 10px; background-color: #e8f5e9; border-left: 4px solid #4CAF50;">
+		        <div style="margin-top: 20px; padding: 10px; background-color: #f5f5f5; border-left: 4px solid #999;">
 		            <strong>Status:</strong> <span id="test-sequence-status">Idle</span><br>
 		            <strong>Current Cycle:</strong> <span id="test-current-cycle">0</span> / <span id="test-total-cycles">0</span><br>
 		            <strong>Current Step:</strong> <span id="test-current-step">None</span><br>
 		            <strong>Time Remaining:</strong> <span id="test-time-remaining">0</span> seconds
 		        </div>
 		    </div>
-	    
+    
 		    <!-- Practical Section -->
-		    <div style="border: 2px solid #2196F3; padding: 20px; background-color: #f9f9f9;">
-		        <h3 style="color: #2196F3;">Practical Section</h3>
+		    <div style="border: 2px solid #ccc; padding: 20px;">
+		        <h3>Practical Section</h3>
 		        <p style="color: #666; font-style: italic;">Use this section for longer production cycles (hours/days)</p>
-	        
-		        <!-- Practical inputs will go here -->
-		        <p style="color: #999;">Coming soon...</p>	
+        
+		        <!-- Sensor Gauges -->
+		        <h4>Bioreactor 1 Sensors</h4>
+		        <div style="display: grid; grid-template-columns: auto auto auto auto; gap: 20px;">
+		            <div>
+		                <div id="bio-thermo-gauge1"></div>
+		                <p style="margin: 5px 0; text-align: center; font-weight: bold;">Temperature</p>
+		            </div>
+		            <div>
+		                <div id="bio-ph-gauge2"></div>
+		                <p style="margin: 5px 0; text-align: center; font-weight: bold;">pH</p>
+		            </div>
+		            <div>
+		                <div id="bio-oxygen-gauge1"></div>
+		                <p style="margin: 5px 0; text-align: center; font-weight: bold;">Dissolved O2</p>
+		            </div>
+		            <div>
+		                <div id="bio-turbidity-gauge1"></div>
+		                <p style="margin: 5px 0; text-align: center; font-weight: bold;">Turbidity</p>
+		            </div>
+		        </div>
+        
+		        <!-- Motor and Pump Gauges -->
+		        <h4 style="margin-top: 30px;">Bioreactor 1 Actuators</h4>
+		        <div style="display: grid; grid-template-columns: auto auto auto auto auto; gap: 20px;">
+		            <div>
+		                <div id="bio-stirring-gauge1"></div>
+		                <p style="margin: 5px 0; text-align: center; font-weight: bold;">Stirring Motor</p>
+		            </div>
+		            <div>
+		                <div id="bio-pump1-gauge1"></div>
+		                <p style="margin: 5px 0; text-align: center; font-weight: bold;">Base Pump</p>
+		            </div>
+		            <div>
+		                <div id="bio-pump2-gauge1"></div>
+		                <p style="margin: 5px 0; text-align: center; font-weight: bold;">Acid Pump</p>
+		            </div>
+		            <div>
+		                <div id="bio-pump3-gauge1"></div>
+		                <p style="margin: 5px 0; text-align: center; font-weight: bold;">Water Pump (Input)</p>
+		            </div>
+		            <div>
+		                <div id="bio-pump3-gauge2"></div>
+		                <p style="margin: 5px 0; text-align: center; font-weight: bold;">Harvest Pump (Output)</p>
+		            </div>
+		        </div>
+        
+		        <p style="color: #999; margin-top: 30px;">Practical sequencing controls coming soon...</p>
 		    </div>
 		</div>
+
+
 
     <script src="js/plotly.js"></script>
     <script src="js/tabbing.js"></script>

@@ -628,7 +628,8 @@ void loop() {
         //running for dryer only 
         if (i == 1)
         {
-            RLHTCommandPIDAuto(bio_post_heaters[1][0], bio_post_heaters[1][1],bio_post_heater_pid[1][1],bio_post_heater_pid[1][0],bio_thermo_val[3],timerReadSeconds(timer));
+            RLHTCommandAuto(bio_post_heaters[1][0],bio_post_heaters[1][1], bio_post_heater_pid[1][0],bio_post_heaters[1][2], bio_post_heaters[1][3]);
+            //RLHTCommandPIDAuto(bio_post_heaters[1][0], bio_post_heaters[1][1],bio_post_heater_pid[1][1],bio_post_heater_pid[1][0],bio_thermo_val[3],timerReadSeconds(timer));
            //if not oscillating...
         // if (checkOsc == 0) {
         //   timerRestart(timer);

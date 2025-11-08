@@ -628,7 +628,7 @@ void loop() {
         //running for dryer only 
         if (i == 1)
         {
-            RLHTCommandAuto(bio_post_heaters[1][0],bio_post_heaters[1][1], bio_post_heater_pid[1][0],bio_post_heaters[1][2], bio_post_heaters[1][3]);
+            RLHTCommandAuto(bio_post_heaters[1][0],bio_post_heaters[1][1], bio_post_heater_pid[1][0],bio_post_heater_pid[1][1],bio_post_heaters[1][2], bio_post_heaters[1][3]);
             //RLHTCommandPIDAuto(bio_post_heaters[1][0], bio_post_heaters[1][1],bio_post_heater_pid[1][1],bio_post_heater_pid[1][0],bio_thermo_val[3],timerReadSeconds(timer));
            //if not oscillating...
         // if (checkOsc == 0) {
@@ -733,15 +733,21 @@ void RLHTRequestThermo(int address, float* t1, float* t2)
   *t1 = thermo1.number;
   *t2 = thermo2.number;
 }
-void RLHTCommandAuto(int address, byte heater,  float setpoint, byte thermocouple, bool enableReverse){
-  FLOATUNION_t setAuto;
-  setAuto.number = setpoint;
+void RLHTCommandAuto(int address, byte heater,  float heatsetpoint, float setKp, byte thermocouple, bool enableReverse){
+  FLOATUNION_t setpoint;
+  FLOATUNION_t Kp;
+  setpoint.number = heatsetpoint;
+  Kp.number = setKp; 
   Wire.beginTransmission(address);
   Wire.write('A');
   Wire.write(heater);
   for(int i=0; i<4; i++){
-    Wire.write(setAuto.bytes[i]);              // sends one byte
+    Wire.write(setpoint.bytes[i]);              // sends one byte
   }
+  for(int i=0;i<4;i++){
+    Wire.write(Kp.bytes[i]);
+  }
+
   Wire.write(thermocouple);
   Wire.write(enableReverse);
   Wire.endTransmission();    // stop transmitting

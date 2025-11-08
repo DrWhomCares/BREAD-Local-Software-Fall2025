@@ -3,7 +3,7 @@
 #include <FastLED.h>
 #include <PID_v1.h>
 
-#define I2C_ADR 17
+#define I2C_ADR 14
 
 #define ESTOP   2
 #define LED_PIN 5
@@ -21,9 +21,10 @@ long lastThermoRead = 0;
 long lastSerialPrint = 0;
 
 //auto tuning variables
+int autocheck = 0;
 int checkOsc = 0;
 int peak = 0;
-hw_timer_t *timer = NULL;
+double time = 0;
 float bio_auto[5] = {0,0,0,0,0}; // {maxTemp, prevTemp, prevTime, Peak1, prevDeriv}
 
 //Edit these offsets to calibrate thermocouples as needed
@@ -190,7 +191,7 @@ void loop() {
 }
 void autoTune(){
   //float tmp = 10; not a real value  
-  Serial.print("Current Kp: ");
+  /*Serial.print("Current Kp: ");
   Serial.println(tmp);
   Serial.print("time");
   Serial.println(time);
@@ -199,7 +200,7 @@ void autoTune(){
   Serial.print("setpoint: ");
   Serial.println(setpoint);
   Serial.println("temp bio: ");
-  
+  */
   Serial.println();
   if(bio_auto[2] == 0 && autoCheck == 1)
   {
@@ -214,7 +215,7 @@ void autoTune(){
     double driv = (RLHT_auto.thermo1 - bio_auto[1])/(time - bio_auto[2]);
     
     Serial.print("currentTemp: ");
-    Serial.println(temp);
+    Serial.println(RLHT_auto.thermo1);
     Serial.print("Deriv: ");
     Serial.println(driv);
     Serial.print("prevDeriv: ");
@@ -276,7 +277,7 @@ void autoTune(){
           float time = timerReadSeconds(timer);
           //reset Command
           //RLHTCommandPID(address, heater, 0, 0, 0);
-          relay1PID.SetTunings(0,0,0)
+          relay1PID.SetTunings(0,0,0);
           //add values to
 
           //bio_heater_auto_pid_vals[0] = 0.6*bio_post_heater_pid[1][1];
@@ -493,8 +494,8 @@ void setParametersRLHT(char *in_data)
       }
       if(in_data[1] == 1){
         RLHT_auto.heatSetpoint_1 = float1.number;
-        RLHT_auto.Ku_1 = float2.number;
-        RLHT_auto.tau_1 = float3.number;
+        RLHT_auto.Kp_1 = float2.number;
+        
       }
       autocheck = 1
       break;

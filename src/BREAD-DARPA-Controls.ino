@@ -422,6 +422,7 @@ Chem Decon Commands:
             //Send initial Kp value
             bio_post_heater_pid[index][1] = postValue.toFloat();
             timer = timerBegin(0, 80, true);
+            Serial.println("bilbo");
             RLHTCommandAuto(bio_post_heaters[index][0],bio_post_heaters[index][1], bio_post_heater_pid[index][0],bio_post_heater_pid[index][1],bio_post_heaters[index][2], bio_post_heaters[index][3]);
             break;
           case 's': //setpoint
@@ -628,6 +629,7 @@ void loop() {
         //running for dryer only 
         if (i == 1)
         {
+            Serial.println("loop dude");
             RLHTCommandAuto(bio_post_heaters[1][0],bio_post_heaters[1][1], bio_post_heater_pid[1][0],bio_post_heater_pid[1][1],bio_post_heaters[1][2], bio_post_heaters[1][3]);
             //RLHTCommandPIDAuto(bio_post_heaters[1][0], bio_post_heaters[1][1],bio_post_heater_pid[1][1],bio_post_heater_pid[1][0],bio_thermo_val[3],timerReadSeconds(timer));
            //if not oscillating...
@@ -739,6 +741,7 @@ void RLHTCommandAuto(int address, byte heater,  float heatsetpoint, float setKp,
   setpoint.number = heatsetpoint;
   Kp.number = setKp; 
   Wire.beginTransmission(address);
+  Serial.println("wrote a dude");
   Wire.write('A');
   Wire.write(heater);
   for(int i=0; i<4; i++){
@@ -751,7 +754,7 @@ void RLHTCommandAuto(int address, byte heater,  float heatsetpoint, float setKp,
   Wire.write(thermocouple);
   Wire.write(enableReverse);
   Wire.endTransmission();    // stop transmitting
-  
+  Serial.println("unwrote a dude");
   
 
 }

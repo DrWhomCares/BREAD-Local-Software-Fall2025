@@ -3,7 +3,7 @@
 #include <FastLED.h>
 #include <PID_v1.h>
 
-#define I2C_ADR 14
+#define I2C_ADR 10
 
 #define ESTOP   2
 #define LED_PIN 5
@@ -21,10 +21,10 @@ long lastThermoRead = 0;
 long lastSerialPrint = 0;
 
 //auto tuning variables
-int autocheck = 0;
+int autoCheck = 0;
 int checkOsc = 0;
 int peak = 0;
-double time = 0;
+
 float bio_auto[5] = {0,0,0,0,0}; // {maxTemp, prevTemp, prevTime, Peak1, prevDeriv}
 
 //Edit these offsets to calibrate thermocouples as needed
@@ -35,6 +35,29 @@ bool E_STOP = false;
 
 CRGB led;
 int hue = 0;
+
+struct Timer_t
+{
+  unsigned long timeStart;
+  bool running = false;
+  float time(){
+    if(running){
+      return ((millis() - timeStart) / 1000.0);
+    } else {
+      return 0;
+    }
+  }
+  void start(){
+    timeStart = millis();
+    running = true;
+  }
+  void stop(){
+    running = false;
+  }
+  void restart(){
+    timeStart = millis();
+  }
+}timer;
 
 struct RLHT_t
 {
@@ -156,7 +179,14 @@ void loop() {
   measureThermocouples();
   if(!E_STOP)
   {
-    
+    if(autoCheck == 1){
+      autoTune();
+      actuateRelays();
+      printOutput();
+      return;
+    }
+
+
     setPIDTunings();
     // assign thermocouple readings to relay inputs
     switch(RLHT.thermoSelect[0]){
@@ -204,15 +234,13 @@ void autoTune(){
   Serial.println();
   if(bio_auto[2] == 0 && autoCheck == 1)
   {
-    Serial.println("Time set");
-    bio_auto[2] = time;
-    Serial.println(bio_auto[2]);
+    bio_auto[2] = timer.time();
   }
 //we could just increase the gain super slowly
-  if (autoCheck == 1 && time - bio_auto[2] > 20)
+  if (autoCheck == 1 && timer.time() - bio_auto[2] > 20)
   {
     //((current T - previous T) / (current time - previous timee))
-    double driv = (RLHT_auto.thermo1 - bio_auto[1])/(time - bio_auto[2]);
+    double driv = (RLHT_auto.thermo1 - bio_auto[1])/(timer.time() - bio_auto[2]);
     
     Serial.print("currentTemp: ");
     Serial.println(RLHT_auto.thermo1);
@@ -255,7 +283,7 @@ void autoTune(){
         bio_auto[0] = 0;
         peak = 1;
         Serial.println("first peak");
-        timerRestart(timer);
+        timer.restart();
         bio_auto[2] = 0;
         Serial.println("time reset");
       }
@@ -271,10 +299,10 @@ void autoTune(){
         if(delp > 0){
           RLHT_auto.Kp_1 = (RLHT_auto.Kp_1 / 1.5); //or Ku - (Ku/2)
           //RLHTCommandPID(address, heater,bio_post_heater_pid[1][1],0,0);
-          relay1PID.SetTunings(RLHT_auto.Kp_1, 0, 0)
+          relay1PID.SetTunings(RLHT_auto.Kp_1, 0, 0);
         }
         else{
-          float time = timerReadSeconds(timer);
+          float time = timer.time();
           //reset Command
           //RLHTCommandPID(address, heater, 0, 0, 0);
           relay1PID.SetTunings(0,0,0);
@@ -288,18 +316,18 @@ void autoTune(){
           RLHT_auto.Kd_1 = (0.075*RLHT_auto.Kp_1)*time;
           checkOsc = 0;
           autoCheck = 0;
-          timerStop(timer);
+          timer.stop();
           bio_auto[2] = 0;
           Serial.println("hit");
         }
       }
     }
-    // if(bio_auto[2] != 0){
-    //   bio_auto[2] = time;
-    // }
+    //if(bio_auto[2] != 0){
+    //  bio_auto[2] = timer.time();
+    //}
     //saving old time, temp, and derivative
-    bio_auto[1] = temp;
-    bio_auto[2] = time;
+    bio_auto[1] = RLHT_auto.thermo1;
+    bio_auto[2] = timer.time();
     bio_auto[4] = driv;
   }
 }
@@ -466,6 +494,7 @@ void setParametersRLHT(char *in_data)
         RLHT.thermoSelect[1] = in_data[6];
         relay2PID.SetControllerDirection(in_data[7]);   // Direct = 0, Reverse = 1
       }
+      autoCheck = 0;
       break;
     case 'P':
       for(int i=0; i<4; i++)  // populate variables for PID tuning
@@ -486,6 +515,8 @@ void setParametersRLHT(char *in_data)
         RLHT.Ki_2 = (double)float2.number;
         RLHT.Kd_2 = (double)float3.number;
       }
+      autoCheck = 0;
+      break;
      case 'A':
       for(int i=0; i<4; i++){
         float1.bytes[i] = in_data[i+2];
@@ -497,7 +528,10 @@ void setParametersRLHT(char *in_data)
         RLHT_auto.Kp_1 = float2.number;
         
       }
-      autocheck = 1
+      autoCheck = 1;
+      if(!timer.running){
+        timer.start();
+      }
       break;
   }
 }

@@ -422,7 +422,7 @@ Chem Decon Commands:
             //Send initial Kp value
             bio_post_heater_pid[index][1] = postValue.toFloat();
             timer = timerBegin(0, 80, true);
-            RLHTCommandPID(bio_post_heaters[index][0], bio_post_heaters[index][1], bio_post_heater_pid[index][1], 0, 0);
+            RLHTCommandAuto(bio_post_heaters[index][0],bio_post_heaters[index][1], bio_post_heater_pid[index][0],bio_post_heater_pid[index][1],bio_post_heaters[index][2], bio_post_heaters[index][3]);
             break;
           case 's': //setpoint
             bio_post_heater_pid[index][0] = postValue.toFloat();

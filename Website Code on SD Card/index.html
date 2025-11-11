@@ -781,6 +781,10 @@
 						<p style="margin: 5px 0;"><strong>Turbidity 1</strong></p>
 					</div>
 					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-pressure"></div>
+						<p style="margin: 5px 0;"><strong>System Pressure</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
 						<div id="seq-prac-stirring2"></div>
 						<p style="margin: 5px 0;"><strong>Stirring Motor 2</strong></p>
 					</div>
@@ -1338,6 +1342,29 @@
         }
     }];
 
+	//----------------Pressure Gauge-----------------------//
+	var pressure_gauge = [{
+		domain: { x: [0, 1], y: [0, 1] },
+		value: 0,
+		title: { text: "" },
+		type: "indicator",
+		mode: "gauge+number",
+		delta: { reference: 50 },
+		number: {'valueformat':'.1f'},
+		gauge: {
+			axis: { range: [null, 100] },
+			bar: { color: "blue" },
+			steps: [
+				{ range: [0, 100], color: "#dddddd" },
+			],
+			threshold: {
+                line: { color: "red", width: 4 },
+                thickness: 0.75,
+                value: 14
+            }
+		}
+	}];
+
     //----------------Dissolved Oxygen Gauge-----------------------//
     var oxygen_gauge = [{
         domain: { x: [0, 1], y: [0, 1] },
@@ -1677,6 +1704,7 @@
 	Plotly.newPlot("seq-prac-acid-pump1", motor_gauge, gaugeLayout);
 	Plotly.newPlot("seq-prac-water-pump", motor_gauge, gaugeLayout);
 	Plotly.newPlot("seq-prac-harvest-pump", motor_gauge, gaugeLayout);
+	Plotly.newPlot('seq-prac-pressure', pressure_gauge, gaugeLayout);
 
 	// Set titles
 	Plotly.restyle('seq-prac-thermo1', {title: "Thermocouple 1"});
@@ -1688,6 +1716,7 @@
 	Plotly.restyle("seq-prac-acid-pump1", {title: "Acid Pump 1"});
 	Plotly.restyle("seq-prac-water-pump", {title: "Water Pump"});
 	Plotly.restyle("seq-prac-harvest-pump", {title: "Harvest Pump"});
+	Plotly.restyle('seq-prac-pressure', {title: "System Pressure (PSI)"});
 
 	//----------------Sequencing Control Variables-----------------------//
 	var testSequenceActive = false;
@@ -1803,7 +1832,7 @@
 		
 		// Activate stirring motor 2
 		console.log('Activating stirring motor for', testSequenceState.timeRemaining, 'seconds');
-		setGaugeValue(80, 'seq-test-stirring2');
+		setGaugeValue(50, 'seq-test-stirring2');
 		
 		testSequenceTimer = setInterval(() => {
 			testSequenceState.timeRemaining--;
@@ -2180,7 +2209,13 @@
             bioGaugeInfo["bio-turbidity-gauge2"].value = bioVals[8]
             bioGaugeInfo["bio-pro-gauge1"].value = bioVals[9]
             bioGaugeInfo["bio-pro-gauge2"].value = bioVals[10]
-
+			if(bioVals[11]) {
+				Plotly.update('seq-prac-pressure', {
+					value: parseFloat(bioVals[11]), 
+					title: "System Pressure (PSI)", 
+					'gauge.bar.color': "blue",
+				});
+			}
             updateBioPhGauge("bio-ph-gauge1")
             updateBioPhGauge("bio-ph-gauge2")
             updateBioProGauge("bio-pro-gauge1")
@@ -2312,7 +2347,7 @@
 	function sendPumpCommand(gaugeID, value) {
 		// Map gauge IDs to form parameter names (based on your existing code)
 		const gaugeToParam = {
-			'seq-test-input-pump': 'bm3',      // Water Pump - same as bio-pump3-gauge1
+			'seq-test-input-pump': 'bm5',      // Using Spent Media Pump in place of Water Pump due to water pump issues
 			'seq-test-stirring2': 'bm6',       // Stirring Motor 2 - same as bio-stirring-gauge2
 			'seq-test-output-pump': 'bm9',     // Harvest Pump - same as bio-pump3-gauge2
 			'bio-stirring-gauge1': 'bm1',

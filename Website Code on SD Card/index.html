@@ -1,615 +1,2574 @@
-#include <Wire.h>
-#include <FastLED.h>
-#include <PID_v1.h>
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" type="text/css" href="css/style.css">
+	<style>
+		.time-input-group {
+			display: flex;
+			align-items: center;
+			gap: 5px;
+		}
+		.time-input-group input {
+			width: 60px;
+		}
+		.time-input-group span {
+			font-weight: bold;
+		}
+	</style>
+    </head>
+    <body onload="loadData()">
 
-#define I2C_ADR 28
+        <h1>BREAD Configuration and Controls</h1>
+        <div style="display: flex">
+            <button id="run" onclick="setRunning()">Start Logging Data</button>
+            <button id="estop" onclick="setESTOP()" style="color: white; background-color: red;">E-STOP OFF</button>
+            <div style="display: flex; flex-direction: column;">
+                <button id="download-pyrolysis" onclick="downloadCSVFile('pyrolysis-data.csv', 'pyrolysis-data.csv')">Download Pyrolysis Data</button>
+                <button id="delete-pyrolysis" ondblclick="clearPyrolysis()">Clear All Pyrolysis Data</button>
+            </div>
+            <div style="display: flex; flex-direction: column;">
+                <button id="download-bio" onclick="downloadCSVFile('bioreactor-data.csv', 'bioreactor-data.csv')">Download Bioreactor Data</button>
+                <button id="delete-bio" ondblclick="clearBioreactor()">Clear All Bioreactor Data</button>
+            </div>
+            <div style="display: flex; flex-direction: column;">
+                <button id="download-chem" onclick="downloadCSVFile('chemreactor-data.csv', 'chemreactor-data.csv')">Download Chemreactor Data</button>
+                <button id="delete-chem" ondblclick="clearChemreactor()">Clear All Chemreactor Data</button>
+            </div>
+            <button ondblclick="clearPyrolysis(); clearBioreactor(); clearChemreactor();">Clear All Data</button>
+            <div style="display: flex">
+                <p style="margin: 0; margin-left: 50px; margin-right: 10px">Connection to ESP32: </p>
+                <div id="connection" style="height: 18px; width: 18px; background-color: red; border-radius: 50%"></div>
+            </div>
+        </div>
+        
+        <iframe name="target" style="display:none;"></iframe>
+        <hr>
+        <nav class="tabnav">
+            <button class="tablink" onclick="openPage('pyrolysis', this, 'green')" id="defaultOpen">Pyrolsis Reactor</button>
+            <button class="tablink" onclick="openPage('bioreactor', this, 'green')">Bioreactor</button>
+            <button class="tablink" onclick="openPage('chemreactor', this, 'green')">Chemical Deconstruction Reactor</button>
+            <button class="tablink" onclick="openPage('sequencing', this, 'green')">Sequencing</button>
+            <!-- <button class="tablink" onclick="openPage('post-process', this, 'green')">post-processing</button> -->
+        </nav>
+        <div id="pyrolysis" class="tabcontent">
+            <!-- <h2>Pyrolysis Reactor</h2> -->
+            <!-- Gauge area -->
+            <div style="display: grid; grid-template-columns: auto auto auto auto auto;">
+                <div>
+                    <div id="pyrolysis-thermo-gauge1"></div>
+                    <!-- <p>Status: ON/OFF (from slice) </p> -->
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="ps1" id="pyrolysis-thermo-gauge1-amount"><br>
+                        <button onclick="
+                            pyrolysisGaugeInfo['pyrolysis-thermo-gauge1'].setpoint = document.getElementById('pyrolysis-thermo-gauge1-amount').value;
+                            updatePyrolysisGauge('pyrolysis-thermo-gauge1');
+                        ">Push Data</button>
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="pp1" id="pyrolysis-thermo-gauge1-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="pi1" id="pyrolysis-thermo-gauge1-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="pd1" id="pyrolysis-thermo-gauge1-kd"><br>
+                        <button onclick="">Push Data</button>
+                    </form>
+                    <p>Thermocouple #: </p>
+                    <p>Heater #: </p>
+                </div>
+                <div>
+                    <div id="pyrolysis-thermo-gauge2"></div>
+                    <!-- <p>Status: ON/OFF (from slice) </p> -->
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="ps2" id="pyrolysis-thermo-gauge2-amount"><br>
+                        <button onclick="
+                            pyrolysisGaugeInfo['pyrolysis-thermo-gauge2'].setpoint = document.getElementById('pyrolysis-thermo-gauge2-amount').value;
+                            updatePyrolysisGauge('pyrolysis-thermo-gauge2');
+                        ">Push Data</button>                
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="pp2" id="pyrolysis-thermo-gauge2-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="pi2" id="pyrolysis-thermo-gauge2-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="pd2" id="pyrolysis-thermo-gauge2-kd"><br>
+                        <button onclick="">Push Data</button>
+                    </form>
+                    <p>Thermocouple #: </p>
+                    <p>Heater #: </p>
+                </div>
+                <div>
+                    <div id="pyrolysis-thermo-gauge3"></div>
+                    <!-- <p>Status: ON/OFF (from slice) </p> -->
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="ps3" id="pyrolysis-thermo-gauge3-amount"><br>
+                        <button onclick="
+                            pyrolysisGaugeInfo['pyrolysis-thermo-gauge3'].setpoint = document.getElementById('pyrolysis-thermo-gauge3-amount').value;
+                            updatePyrolysisGauge('pyrolysis-thermo-gauge3');
+                        ">Push Data</button>    
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="pp3" id="pyrolysis-thermo-gauge3-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="pi3" id="pyrolysis-thermo-gauge3-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="pd3" id="pyrolysis-thermo-gauge3-kd"><br>
+                        <button onclick="">Push Data</button>
+                    </form>
+                    <p>Thermocouple #: </p>
+                    <p>Heater #: </p>
+                </div>
+                <div>
+                    <div id="pyrolysis-thermo-gauge4"></div>
+                    <!-- <p>Status: ON/OFF (from slice) </p> -->
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="ps4" id="pyrolysis-thermo-gauge4-amount"><br>
+                        <button onclick="
+                            pyrolysisGaugeInfo['pyrolysis-thermo-gauge4'].setpoint = document.getElementById('pyrolysis-thermo-gauge4-amount').value;
+                            updatePyrolysisGauge('pyrolysis-thermo-gauge4');
+                        ">Push Data</button>    
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="pp4" id="pyrolysis-thermo-gauge4-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="pi4" id="pyrolysis-thermo-gauge4-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="pd4" id="pyrolysis-thermo-gauge4-kd"><br>
+                        <button onclick="">Push Data</button>
+                    </form>
+                    <p>Thermocouple #: </p>
+                    <p>Heater #: </p>
+                </div>
+                <div>
+                    <div id="pyrolysis-thermo-gauge5"></div>
+                    <!-- <p>Status: ON/OFF (from slice) </p> -->
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="ps5" id="pyrolysis-thermo-gauge5-amount"><br>
+                        <button onclick="
+                            pyrolysisGaugeInfo['pyrolysis-thermo-gauge5'].setpoint = document.getElementById('pyrolysis-thermo-gauge5-amount').value;
+                            updatePyrolysisGauge('pyrolysis-thermo-gauge5');
+                        ">Push Data</button>    
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="pp5" id="pyrolysis-thermo-gauge5-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="pi5" id="pyrolysis-thermo-gauge5-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="pd5" id="pyrolysis-thermo-gauge5-kd"><br>
+                        <button onclick="">Push Data</button>
+                    </form>
+                    <p>Thermocouple #: </p>
+                    <p>Heater #: </p>
+                </div>
+                <div>
+                    <div id="pyrolysis-thermo-gauge6"></div>
+                    <!-- <p>Status: ON/OFF (from slice) </p> -->
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="ps6" id="pyrolysis-thermo-gauge6-amount"><br>
+                        <button onclick="
+                            pyrolysisGaugeInfo['pyrolysis-thermo-gauge6'].setpoint = document.getElementById('pyrolysis-thermo-gauge6-amount').value;
+                            updatePyrolysisGauge('pyrolysis-thermo-gauge6');
+                        ">Push Data</button>   
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="pp6" id="pyrolysis-thermo-gauge6-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="pi6" id="pyrolysis-thermo-gauge6-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="pd6" id="pyrolysis-thermo-gauge6-kd"><br>
+                        <button onclick="">Push Data</button>
+                    </form>
+                    <p>Thermocouple #: </p>
+                    <p>Heater #: </p>
+                </div>
+                <div>
+                    <div id="pyrolysis-thermo-gauge7"></div>
+                    <!-- <p>Status: ON/OFF (from slice) </p> -->
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="ps7" id="pyrolysis-thermo-gauge7-amount"><br>
+                        <button onclick="
+                            pyrolysisGaugeInfo['pyrolysis-thermo-gauge7'].setpoint = document.getElementById('pyrolysis-thermo-gauge7-amount').value;
+                            updatePyrolysisGauge('pyrolysis-thermo-gauge7');
+                        ">Push Data</button>
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="pp7" id="pyrolysis-thermo-gauge7-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="pi7" id="pyrolysis-thermo-gauge7-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="pd7" id="pyrolysis-thermo-gauge7-kd"><br>
+                        <button onclick="">Push Data</button>
+                    </form>
+                    <p>Thermocouple #: </p>
+                    <p>Heater #: </p>
+                </div>
+                <div>
+                    <div id="pyrolysis-thermo-gauge8"></div>
+                    <!-- <p>Status: ON/OFF (from slice) </p> -->
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="ps8" id="pyrolysis-thermo-gauge8-amount"><br>
+                        <button onclick="
+                            pyrolysisGaugeInfo['pyrolysis-thermo-gauge8'].setpoint = document.getElementById('pyrolysis-thermo-gauge8-amount').value;
+                            updatePyrolysisGauge('pyrolysis-thermo-gauge8');
+                        ">Push Data</button>
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="pp8" id="pyrolysis-thermo-gauge8-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="pi8" id="pyrolysis-thermo-gauge8-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="pd8" id="pyrolysis-thermo-gauge8-kd"><br>
+                        <button onclick="">Push Data</button>
+                    </form>
+                    <p>Thermocouple #: </p>
+                    <p>Heater #: </p>
+                </div>
+                <div>
+                    <div id="pyrolysis-thermo-gauge9"></div>
+                    <!-- <p>Status: ON/OFF (from slice) </p> -->
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="ps9" id="pyrolysis-thermo-gauge9-amount"><br>
+                        <button onclick="
+                            pyrolysisGaugeInfo['pyrolysis-thermo-gauge9'].setpoint = document.getElementById('pyrolysis-thermo-gauge9-amount').value;
+                            updatePyrolysisGauge('pyrolysis-thermo-gauge9');
+                        ">Push Data</button>
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="pp9" id="pyrolysis-thermo-gauge9-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="pi9" id="pyrolysis-thermo-gauge9-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="pd9" id="pyrolysis-thermo-gauge9-kd"><br>
+                        <button onclick="">Push Data</button>
+                    </form>
+                    <p>Thermocouple #: </p>
+                    <p>Heater #: </p>
+                </div><div>
+                    <div id="pyrolysis-thermo-gauge10"></div>
+                    <!-- <p>Status: ON/OFF (from slice) </p> -->
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="ps10" id="pyrolysis-thermo-gauge10-amount"><br>
+                        <button onclick="
+                            pyrolysisGaugeInfo['pyrolysis-thermo-gauge10'].setpoint = document.getElementById('pyrolysis-thermo-gauge10-amount').value;
+                            updatePyrolysisGauge('pyrolysis-thermo-gauge10');
+                        ">Push Data</button>
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="pp10" id="pyrolysis-thermo-gauge10-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="pi10" id="pyrolysis-thermo-gauge10-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="pd10" id="pyrolysis-thermo-gauge10-kd"><br>
+                        <button onclick="">Push Data</button>
+                    </form>
+                    <p>Thermocouple #: </p>
+                    <p>Heater #: </p>
+                </div>
+            </div>
 
-#define ESTOP   2
-#define LED_PIN 5
+            <!-- Graph area -->
+            <div id='pyrolysis-thermo-graph'></div>
+            <label for="tracking-amount">Number of previous seconds to track: </label>
+            <input type="number" id="pyrolysis-tracking-amount" name="tracking-amount">
+            <button id="pyrolysis-tracking" onclick="setTracking('pyrolysis-tracking', 'pyrolysis-tracking-amount', 'pyrolysis-thermo-graph')">Track Data</button>
 
-#define DIR1  7
-#define MC1   6
-#define BR1   8
-#define DIR2  10
-#define MC2   11
-#define BR2   12
+            <br><br><br><br>
+        </div>
 
-#define ENC_A1  A1
-#define ENC_B1  A2
-#define ENC_A2  A1
-#define ENC_B2  A0
+        <div id="bioreactor"class="tabcontent">
+            <!-- <h1>Bioreactor</h1> -->
+            <div id="bio-thermocouples" style="display: flex">
+                <div id="bio-thermo-gauge1"></div>
+                <div id="bio-thermo-gauge2"></div>
+                <div>
+                    <div id="bio-thermo-graph" class="tabcontent"></div>
+                    <label>Number of previous seconds to track: </label>
+                    <input type="number" id="bio-thermo-tracking-amount">
+                    <button id="bio-thermo-tracking" onclick="setTracking('bio-thermo-tracking', 'bio-thermo-tracking-amount', 'bio-thermo-graph')">Track Data</button>        
+                </div>
+            </div>
+        
+            <div id="bio-ph" style="display: flex">
+                <div>
+                    <div id="bio-ph-gauge1"></div>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="bs1" id="bio-ph-gauge1-amount">
+                        <button onclick="
+                            bioGaugeInfo['bio-ph-gauge1'].setpoint = document.getElementById('bio-ph-gauge1-amount').value;
+                            updateBioPhGauge('bio-ph-gauge1')
+                        ">Push Data</button>    
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="bp1" id="bio-ph-gauge1-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="bi1" id="bio-ph-gauge1-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="bd1" id="bio-ph-gauge1-kd">
+                        <br>
+                        <button onclick="">Push Data</button>
+                    </form>
+                </div>
+                <div>
+                    <div id="bio-ph-gauge2"></div>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="bs2" id="bio-ph-gauge2-amount">
+                        <button onclick="
+                            bioGaugeInfo['bio-ph-gauge2'].setpoint = document.getElementById('bio-ph-gauge2-amount').value;
+                            updateBioPhGauge('bio-ph-gauge2')
+                        ">Push Data</button>    
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="bp2" id="bio-ph-gauge2-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="bi2" id="bio-ph-gauge2-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="bd2" id="bio-ph-gauge2-kd">
+                        <br>
+                        <button onclick="">Push Data</button>
+                    </form>
+                </div>
+                <div>
+                    <div id="bio-ph-graph" style="height: 350px; width: 1100px;"></div>
+                    <label>Number of previous seconds to track: </label>
+                    <input type="number" id="bio-ph-tracking-amount">
+                    <button id="bio-ph-tracking" onclick="setTracking('bio-ph-tracking', 'bio-ph-tracking-amount', 'bio-ph-graph')">Track Data</button>        
+                </div>
+            </div>
+            <div id="bio-oxygen" style="display: flex">
+                <div id="bio-oxygen-gauge1"></div>
+                <div id="bio-oxygen-gauge2"></div>
+                <div>
+                    <div id="bio-oxygen-graph" style="height: 350px; width: 1100px;"></div>
+                    <label>Number of previous seconds to track: </label>
+                    <input type="number" id="bio-oxygen-tracking-amount">
+                    <button id="bio-oxygen-tracking" onclick="setTracking('bio-oxygen-tracking', 'bio-oxygen-tracking-amount', 'bio-oxygen-graph')">Track Data</button>        
+                </div>
+            </div>
+            <div id="bio-turbidity" style="display: flex">
+                <form action="/form-submit" method="POST" target="target">
+                    <div id="bio-turbidity-gauge1"></div>
+                    <label>Sample time (s):</label>
+                    
+                    <input type="number" step="0.01" name="bt1" id="bio-turbidity-gauge1-amount"><br>
+                    <button onclick="setGaugeValue(document.getElementById('bio-turbidity-gauge1-amount').value, 'bio-turbidity-gauge1')">Push Data</button>
+                </form>
+                <form action="/form-submit" method="POST" target="target">
+                    <div id="bio-turbidity-gauge2"></div>
+                    <label>Sample time (s):</label>
+                    
+                    <input type="number" step="0.01" name="bt2" id="bio-turbidity-gauge2-amount"><br>
+                    <button onclick="setGaugeValue(document.getElementById('bio-turbidity-gauge2-amount').value, 'bio-turbidity-gauge2')">Push Data</button>
+                </form>
+                <div>
+                    <div id="bio-turbidity-graph" style="height: 350px; width: 1100px;"></div>
+                    <label>Number of previous seconds to track: </label>
+                    <input type="number" id="bio-turbidity-tracking-amount">
+                    <button id="bio-turbidity-tracking" onclick="setTracking('bio-turbidity-tracking', 'bio-turbidity-tracking-amount', 'bio-turbidity-graph')">Track Data</button>        
+                </div>
+            </div>
 
-#define PRESSURE_PIN  A3    // Pressure transducer analog input
+            <div id="bio-motors-1" style="display: grid; grid-template-columns: auto auto auto auto auto;">
+                <form action="/form-submit" method="POST" target="target">
+                    <div id="bio-stirring-gauge1"></div>
+                    <label>Setpoint:</label>
+                    <input type="number" step="0.01" name="bm1" id="bio-stirring-gauge1-amount"><br>
+                    <button onclick="setGaugeValue(document.getElementById('bio-stirring-gauge1-amount').value, 'bio-stirring-gauge1')">Push Data</button>
+                </form>
+                <form action="/form-submit" method="POST" target="target">
+                    <div id="bio-pump1-gauge1"></div>
+                    <label>Setpoint:</label>
+                    <input type="number" step="0.01" name="bm2" id="bio-pump1-gauge1-amount"><br>
+                    <button onclick="setGaugeValue(document.getElementById('bio-pump1-gauge1-amount').value, 'bio-pump1-gauge1')">Push Data</button>
+                </form>
+                <form action="/form-submit" method="POST" target="target">
+                    <div id="bio-pump2-gauge1"></div>
+                    <label>Setpoint:</label>
+                    <input type="number" step="0.01" name="bm3" id="bio-pump2-gauge1-amount"><br>
+                    <button onclick="setGaugeValue(document.getElementById('bio-pump2-gauge1-amount').value, 'bio-pump2-gauge1')">Push Data</button>
+                </form>
+                <form action="/form-submit" method="POST" target="target">
+                    <div id="bio-pump3-gauge1"></div>
+                    <label>Setpoint:</label>
+                    <input type="number" step="0.01" name="bm4" id="bio-pump3-gauge1-amount"><br>
+                    <button onclick="setGaugeValue(document.getElementById('bio-pump3-gauge1-amount').value, 'bio-pump3-gauge1')">Push Data</button>
+                </form>
+                <form action="/form-submit" method="POST" target="target">
+                    <div id="bio-pump4-gauge1"></div>
+                    <label>Setpoint:</label>
+                    <input type="number" step="0.01" name="bm5" id="bio-pump4-gauge1-amount"><br>
+                    <button onclick="setGaugeValue(document.getElementById('bio-pump4-gauge1-amount').value, 'bio-pump4-gauge1')">Push Data</button>
+                </form>
+            </div>
+            <div id="bio-motors-2" style="display: grid; grid-template-columns: auto auto auto auto auto;">
+                <form action="/form-submit" method="POST" target="target">
+                    <div id="bio-stirring-gauge2"></div>
+                    <label>Setpoint:</label>
+                    <input type="number" step="0.01" name="bm6" id="bio-stirring-gauge2-amount"><br>
+                    <button onclick="setGaugeValue(document.getElementById('bio-stirring-gauge2-amount').value, 'bio-stirring-gauge2')">Push Data</button>
+                </form>
+                <form action="/form-submit" method="POST" target="target">
+                    <div id="bio-pump1-gauge2"></div>
+                    <label>Setpoint:</label>
+                    <input type="number" step="0.01" name="bm7" id="bio-pump1-gauge2-amount"><br>
+                    <button onclick="setGaugeValue(document.getElementById('bio-pump1-gauge2-amount').value, 'bio-pump1-gauge2')">Push Data</button>
+                </form>
+                <form action="/form-submit" method="POST" target="target">
+                    <div id="bio-pump2-gauge2"></div>
+                    <label>Setpoint:</label>
+                    <input type="number" step="0.01" name="bm8" id="bio-pump2-gauge2-amount"><br>
+                    <button onclick="setGaugeValue(document.getElementById('bio-pump2-gauge2-amount').value, 'bio-pump2-gauge2')">Push Data</button>
+                </form>
+                <form action="/form-submit" method="POST" target="target">
+                    <div id="bio-pump3-gauge2"></div>
+                    <label>Setpoint:</label>
+                    <input type="number" step="0.01" name="bm9" id="bio-pump3-gauge2-amount"><br>
+                    <button onclick="setGaugeValue(document.getElementById('bio-pump3-gauge2-amount').value, 'bio-pump3-gauge2')">Push Data</button>
+                </form>
+                <form action="/form-submit" method="POST" target="target">
+                    <div id="bio-pump4-gauge2"></div>
+                    <label>Setpoint:</label>
+                    <input type="number" step="0.01" name="bm10" id="bio-pump4-gauge2-amount"><br>
+                    <button onclick="setGaugeValue(document.getElementById('bio-pump4-gauge2-amount').value, 'bio-pump4-gauge2')">Push Data</button>
+                </form>
+            </div>
 
-#define SERIAL_UPDATE_TIME_MS       1000
-#define PUMP_PULSE_PERIOD_MS        2000
-#define MOTOR_MAX_SPEED             255
-#define MOTOR_MIN_SPEED             130
-#define TURBIDITY_PUMP_TIME_MS      10000   // time to cycle new sample through tubes
-#define TURBIDITY_PUMP_TIME_R_MS    10000   // time to reverse cycle sample
-#define TURBIDITY_PUMP_SPEED        60      // speed of turbidity pump (percent)
-#define TURBIDITY_SAMPLE_WAIT_MS    3000    // wait time for bubbles to settle before measurement
-#define TURBIDITY_OFFSET            0       // tap water should be approx. 0 NTU
+            <h2>Post Processing</h2>
+            <div id="bio-pro" style="display: flex">
+                <div>
+                    <div id="bio-pro-gauge1"></div>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="Ps1" id="bio-pro-gauge1-amount"><br>
+                        <button onclick="
+                            bioGaugeInfo['bio-pro-gauge1'].setpoint = document.getElementById('bio-pro-gauge1-amount').value;
+                            updateBioProGauge('bio-pro-gauge1')
+                        ">Push Data</button>    
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="Pp1" id="bio-pro-gauge1-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="Pi1" id="bio-pro-gauge1-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="Pd1" id="bio-pro-gauge1-kd">
+                        <br>
+                        <button onclick="">Push Data</button>
+                    </form>
+                </div>
+                <div>
+                    <div id="bio-pro-gauge2"></div>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="Ps2" id="bio-pro-gauge2-amount">
+                        <button onclick="
+                            bioGaugeInfo['bio-pro-gauge2'].setpoint = document.getElementById('bio-pro-gauge2-amount').value;
+                            updateBioProGauge('bio-pro-gauge2')
+                        ">Push Data</button>
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <!-- This needs some work. 
+                         1: The ID for the input field needs to be unique so it wont get confusted with the other values.
+                         2: `onclick` might need to have some javascript code so it will actually do the thing we want it to do. See above (as of 3/27/25, lines 508-514) for an example -->
+                        <label>Autotune Initial Kp:</label>
+                        <input type="number" step="0.01" name="Pa2" id="bio-pro-gauge2-amount">
+                        <button onclick="">Push Data</button>
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="Pp2" id="bio-pro-gauge2-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="Pi2" id="bio-pro-gauge2-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="Pd2" id="bio-pro-gauge2-kd">
+                        <br>
+                        <button onclick="">Push Data</button>
+                    </form>
+                </div>
+                <div>
+                    <div id="bio-pro-graph" style="height: 350px; width: 1100px;"></div>
+                    <label>Number of previous seconds to track: </label>
+                    <input type="number" id="bio-pro-tracking-amount">
+                    <button id="bio-pro-tracking" onclick="setTracking('bio-pro-tracking', 'bio-pro-tracking-amount', 'bio-pro-graph')">Track Data</button>        
+                </div>
+            </div>
+        </div>
 
-CRGB led;
-#define NUM_TURB_LEDS   20
-CRGB turbLEDs[NUM_TURB_LEDS];
+        <div id="chemreactor"class="tabcontent">
+            <!-- <h1>Chemical Deconstruction Reactor</h1> -->
+            <div style="display: grid; grid-template-columns: auto auto auto auto auto auto;">
+                <div>
+                    <div id="chem-thermo-gauge1"></div>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="cs1" id="chem-thermo-gauge1-amount">
+                        <button onclick="
+                        chemGaugeInfo['chem-thermo-gauge1'].setpoint = document.getElementById('chem-thermo-gauge1-amount').value
+                        updateChemGauge('chem-thermo-gauge1')
+                        ">Push Data</button>   
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="cp1" id="chem-thermo-gauge1-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="ci1" id="chem-thermo-gauge1-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="cd1" id="chem-thermo-gauge1-kd">
+                        <button onclick="">Push Data</button>
+                    </form>
+                </div>
+                <div>
+                    <div id="chem-thermo-gauge2"></div>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="cs2" id="chem-thermo-gauge2-amount">
+                        <button onclick="
+                        chemGaugeInfo['chem-thermo-gauge2'].setpoint = document.getElementById('chem-thermo-gauge2-amount').value
+                        updateChemGauge('chem-thermo-gauge2')
+                        ">Push Data</button>   
+                    </form>
+                    <br>
+                    <form action="/form-submit" method="POST" target="target">
+                        <label>Kp:</label>
+                        <input type="number" step="0.01" name="cp2" id="chem-thermo-gauge2-kp">
+                        <br>
+                        <label>Ki:</label>
+                        <input type="number" step="0.01" name="ci2" id="chem-thermo-gauge2-ki">
+                        <br>
+                        <label>Kd:</label>
+                        <input type="number" step="0.01" name="cd2" id="chem-thermo-gauge2-kd">
+                        <button onclick="">Push Data</button>
+                    </form>
+                </div>
+                <div>
+                    <form action="/form-submit" method="POST" target="target">
+                        <div id="chem-pump1-gauge1"></div>
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="cm1" id="chem-pump1-gauge1-amount">
+                        <button onclick="setGaugeValue(document.getElementById('chem-pump1-gauge1-amount').value, 'chem-pump1-gauge1')">Push Data</button>
+                    </form>
+                </div>
+                <div>
+                    <form action="/form-submit" method="POST" target="target">
+                        <div id="chem-pump2-gauge1"></div>
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="cm2" id="chem-pump2-gauge1-amount">
+                        <button onclick="setGaugeValue(document.getElementById('chem-pump2-gauge1-amount').value, 'chem-pump2-gauge1')">Push Data</button>
+                    </form>
+                </div>
+                <div>
+                    <form action="/form-submit" method="POST" target="target">
+                        <div id="chem-pump3-gauge1"></div>
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="cm3" id="chem-pump3-gauge1-amount">
+                        <button onclick="setGaugeValue(document.getElementById('chem-pump3-gauge1-amount').value, 'chem-pump3-gauge1')">Push Data</button>
+                    </form>
+                </div>
+                <div>
+                    <form action="/form-submit" method="POST" target="target">
+                        <div id="chem-pump4-gauge1"></div>
+                        <label>Setpoint:</label>
+                        <input type="number" step="0.01" name="cm4" id="chem-pump4-gauge1-amount">
+                        <button onclick="setGaugeValue(document.getElementById('chem-pump1-gauge4-amount').value, 'chem-pump4-gauge1')">Push Data</button>
+                    </form>
+                </div>
+            </div>
+            <div>
+                <div id="chem-thermo-graph" style="height: 350px; width: 1100px;"></div>
+                <label>Number of previous seconds to track: </label>
+                <input type="number" id="chem-thermo-tracking-amount">
+                <button id="chem-thermo-tracking" onclick="setTracking('chem-thermo-tracking', 'chem-thermo-tracking-amount', 'chem-thermo-graph')">Track Data</button>        
+            </div>
+        </div>
+    </div>
 
-union INTUNION_t //Define an int that can be broken up and sent via I2C
-{
-  int number;
-  uint8_t bytes[4];
-};
+		<div id="sequencing" class="tabcontent">
+			<h2>Bioreactor Sequencing</h2>
+			
+			<!-- Testing Section -->
+			<div style="border: 2px solid #ccc; padding: 20px; margin-bottom: 30px;">
+				<h3>Testing Section</h3>
+				<p style="color: #666; font-style: italic;">Use this section for quick testing cycles with shorter durations</p>
+				
+				<div style="display: grid; grid-template-columns: auto auto; gap: 20px; max-width: 800px;">
+					<div>
+						<label><strong>Number of Cycles:</strong></label>
+						<input type="number" id="test-num-cycles" value="3" min="1" style="width: 100px;">	
+					</div>
+					
+					<div></div>
+					
+					<div>	
+						<label><strong>Feed Pump Runtime:</strong></label>
+						<div class="time-input-group">
+							<input type="number" id="test-feed-hours" value="0" min="0" max="23">
+							<span>h</span>
+							<input type="number" id="test-feed-minutes" value="0" min="0" max="59">
+							<span>m</span>
+							<input type="number" id="test-feed-seconds" value="10" min="0" max="59">
+							<span>s</span>
+						</div>
+						<span style="color: #666; font-size: 0.9em;"> (Step 1: Load reactor)</span>
+					</div>
+					
+					<div>
+						<label><strong>Growth Wait Time:</strong></label>
+						<div class="time-input-group">
+							<input type="number" id="test-growth-hours" value="0" min="0" max="23">
+							<span>h</span>
+							<input type="number" id="test-growth-minutes" value="0" min="0" max="59">
+							<span>m</span>
+							<input type="number" id="test-growth-seconds" value="10" min="0" max="59">
+							<span>s</span>
+						</div>
+						<span style="color: #666; font-size: 0.9em;"> (Step 2: Stirring active)</span>
+					</div>
+					
+					<div>
+						<label><strong>Harvest Pump Runtime:</strong></label>
+						<div class="time-input-group">
+							<input type="number" id="test-harvest-hours" value="0" min="0" max="23">
+							<span>h</span>
+							<input type="number" id="test-harvest-minutes" value="0" min="0" max="59">
+							<span>m</span>
+							<input type="number" id="test-harvest-seconds" value="10" min="0" max="59">
+							<span>s</span>
+						</div>
+						<span style="color: #666; font-size: 0.9em;"> (Step 3: Empty reactor)</span>
+					</div>
+				</div>
+				
+				<div style="margin-top: 20px;">
+					<button id="test-start-btn" style="background-color: #4CAF50; color: white; padding: 10px 20px; font-size: 16px; cursor: pointer;" onclick="startTestingSequence()">
+						Start Testing Sequence
+					</button>
+					<button id="test-stop-btn" style="background-color: #f44336; color: white; padding: 10px 20px; font-size: 16px; cursor: pointer; margin-left: 10px;" onclick="stopTestingSequence()">
+						Stop Sequence
+					</button>
+				</div>
+				
+				<div style="margin-top: 20px; padding: 10px; background-color: #f5f5f5; border-left: 4px solid #666;">
+					<strong>Status:</strong> <span id="test-sequence-status">Idle</span><br>
+					<strong>Current Cycle:</strong> <span id="test-current-cycle">0</span> / <span id="test-total-cycles">0</span><br>
+					<strong>Current Step:</strong> <span id="test-current-step">None</span><br>
+					<strong>Time Remaining:</strong> <span id="test-time-remaining">00:00:00</span>
+				</div>
 
-union FLOATUNION_t //Define an int that can be broken up and sent via I2C
-{
-  float number;
-  uint8_t bytes[4];
-};
+				<!-- Testing Section Pump Gauges -->
+				<h4 style="margin-top: 30px;">Equipment Controls</h4>
+				<div style="display: grid; grid-template-columns: auto auto auto; gap: 20px;">
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-test-input-pump"></div>
+						<p style="margin: 5px 0;"><strong>Input Pump (Water)</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-test-stirring2"></div>
+						<p style="margin: 5px 0;"><strong>Stirring Motor 2</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-test-output-pump"></div>
+						<p style="margin: 5px 0;"><strong>Output Pump (Harvest)</strong></p>
+					</div>
+				</div>
+			</div>
+			
+			<!-- Practical Section -->
+			<div style="border: 2px solid #ccc; padding: 20px;">
+				<h3>Practical Section</h3>
+				<p style="color: #666; font-style: italic;">Use this section for longer production cycles (hours/days)</p>
+				
+				<div style="margin-top: 20px;">
+					<button id="prac-start-btn" style="background-color: #4CAF50; color: white; padding: 10px 20px; font-size: 16px; cursor: pointer;" onclick="startPracticalSequence()">
+						Start Practical Sequence
+					</button>
+					<button id="prac-stop-btn" style="background-color: #f44336; color: white; padding: 10px 20px; font-size: 16px; cursor: pointer; margin-left: 10px;" onclick="stopPracticalSequence()">
+						Stop Sequence
+					</button>
+				</div>
 
-struct DCMT_t {
-  int m1Speed = 0;   // motor 1 speed (0-255)
-  int m2Speed = 0;   // motor 2 speed (0-255)
-  bool m1Dir;  // motor 1 direction (0:backwards, 1:forwards)
-  bool m2Dir;  // motor 2 direction (0:backwards, 1:forwards)
-  bool m1En;   // motor 1 enable (0:off/apply brake, 1:on/coast)
-  bool m2En;   // motor 2 enable (0:off/apply brake, 1:on/coast)
-  double m1OnTime;   // for pulsing pump
-  double m2OnTime;
-  double pHSetpoint;
-  double currentPH;
-  double Kp_pH;
-  double Ki_pH;
-  double Kd_pH;
-  bool pulsePump = false;   // by default, DCMT acts as motor controller
-  bool turbPump1 = false;    // for enabling measuring turbitidy from motor 1
-  bool turbPump2 = false;    // for enabling measuring turbitidy from motor 2
-  float turbVoltage[2];
-  float currentTurbidity[2];
-  uint32_t turbSamplePeriod1 = 10000; // Sampling time is 10s by default
-  uint32_t turbSamplePeriod2 = 10000;
-  float pressureVoltage;
-  float currentPressure;    // Pressure in PSI
-} DCMT, DCMT_old;
+				<div style="margin-top: 20px; padding: 10px; background-color: #f5f5f5; border-left: 4px solid #666;">
+					<strong>Status:</strong> <span id="prac-sequence-status">Idle</span><br>
+					<strong>Current Cycle:</strong> <span id="prac-current-cycle">0</span> / <span id="prac-total-cycles">0</span><br>
+					<strong>Current Step:</strong> <span id="prac-current-step">None</span><br>
+					<strong>Time Remaining:</strong> <span id="prac-time-remaining">00:00:00</span>
+				</div>
+				
+				<!-- Practical Section Gauges -->
+				<div style="display: grid; grid-template-columns: auto auto auto; gap: 20px; margin-top: 20px;">
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-thermo1"></div>
+						<p style="margin: 5px 0;"><strong>Thermocouple 1</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-ph2"></div>
+						<p style="margin: 5px 0;"><strong>pH Sensor 2</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-oxygen1"></div>
+						<p style="margin: 5px 0;"><strong>Dissolved Oxygen 1</strong></p>
+					</div>
+					
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-turbidity1"></div>
+						<p style="margin: 5px 0;"><strong>Turbidity 1</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-pressure"></div>
+						<p style="margin: 5px 0;"><strong>System Pressure</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-stirring2"></div>
+						<p style="margin: 5px 0;"><strong>Stirring Motor 2</strong></p>
+					</div>
+					<div></div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-base-pump1"></div>
+						<p style="margin: 5px 0;"><strong>Base Pump 1</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-acid-pump1"></div>
+						<p style="margin: 5px 0;"><strong>Acid Pump 1</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-water-pump"></div>
+						<p style="margin: 5px 0;"><strong>Water Pump (Input)</strong></p>
+					</div>
+					
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-harvest-pump"></div>
+						<p style="margin: 5px 0;"><strong>Harvest Pump (Output)</strong></p>
+					</div>
+				</div>
+			</div>
+		</div>
 
-// Pressure calibration constants
-const float V_min = 0.5;  // Voltage at 0 psi
-const float V_max = V_min + 4;  // Voltage at 100 psi
-const float P_min = 0;      // Minimum pressure in psi
-const float P_max = 100;    // Maximum pressure in psi
 
-// Moving average filter for pressure
-const int PRESSURE_WINDOW_SIZE = 10;
-float pressureBuffer[PRESSURE_WINDOW_SIZE];
-int pressureBufferIndex = 0;
 
-// Acid control activates when pH > Setpoint so control needs to be reversed
-PID basePID(&(DCMT.currentPH), &(DCMT.m1OnTime), &(DCMT.pHSetpoint), DCMT.Kp_pH, DCMT.Ki_pH, DCMT.Kd_pH, DIRECT);
-PID acidPID(&(DCMT.currentPH), &(DCMT.m2OnTime), &(DCMT.pHSetpoint), DCMT.Kp_pH, DCMT.Ki_pH, DCMT.Kd_pH, REVERSE);
 
-// for tracking pulse periods
-unsigned long m1StartTime;
-unsigned long m2StartTime;
+    <script src="js/plotly.js"></script>
+    <script src="js/tabbing.js"></script>
+    <script>
 
-long lastSerialPrint = 0;
-long lastTurbiditySequence1 = 0;
-int turbidityCycle1 = 0;    // turbidity cycle sequence indicator
-long lastTurbiditySequence2 = 0;
-int turbidityCycle2 = 0;    // turbidity cycle sequence indicator
+    //----------------Pyrolysis thermocouple traces-----------------------//  
+    var pyrolysis_traces = [
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Dissolution Tank"
+        },
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Dissolution Heating Tape"
+        },
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Valve"
+        },
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Char Chamber"
+        },
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Secondary Reactor"
+        },
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Knockout Drum"
+        },
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Condenser 0"
+        },
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Condenser 1"
+        },
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Condenser 2"
+        },
+    ]
 
-bool E_STOP = false;
-
-void estop()
-{
-  if(digitalRead(ESTOP) == HIGH)    // when set to HIGH state
-  {
-    led = CRGB::Red;
-    FastLED.show();
-
-    // save states
-    DCMT_old.m1Speed = DCMT.m1Speed;
-    DCMT_old.m2Speed = DCMT.m2Speed;
-
-    // set critical states to zero
-    DCMT.m1Speed = 0;
-    DCMT.m2Speed = 0;
-    // disable motors
-    DCMT.m1En = false;
-    DCMT.m2En = false;
-
-    E_STOP = true;
-    Serial.println("ESTOP PRESSED!");
-  }
-  else    // when set to LOW state
-  {
-    led = CRGB::Black;
-    FastLED.show();
-
-    // reassign old states if they haven't changed
-    if(!DCMT.m1Speed)
-      DCMT.m1Speed = DCMT_old.m1Speed;
-    if(!DCMT.m2Speed)
-      DCMT.m2Speed = DCMT_old.m2Speed;
-
-    DCMT.m1En = true;
-    DCMT.m2En = true;
-
-    E_STOP = false;
-
-    Serial.println("ESTOP RELEASED!");
-  }
-  actuateMotors();
-}
-
-void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(9600);
-  FastLED.addLeds<NEOPIXEL, LED_PIN>(&led, 1);
-  //FastLED.addLeds<NEOPIXEL, ENC_A2>(turbLEDs, NUM_TURB_LEDS);
-
-  pinMode(ESTOP, INPUT);
-  attachInterrupt(digitalPinToInterrupt(ESTOP), estop, CHANGE);
-
-  pinMode(BR1, INPUT_PULLUP);
-  pinMode(BR2, INPUT_PULLUP);
-  pinMode(MC1, OUTPUT);
-  pinMode(MC2, OUTPUT);
-  pinMode(DIR1, OUTPUT);
-  pinMode(DIR2, OUTPUT);
-  pinMode(ENC_B1, INPUT);   // turbidity sense 1
-  pinMode(ENC_B2, INPUT);   // turbidity sense 2
-  pinMode(PRESSURE_PIN, INPUT);
-
-  // motor 1
-  digitalWrite(DIR1, HIGH);
-  digitalWrite(MC1, LOW);
-  // motor 2
-  digitalWrite(DIR2, HIGH);
-  digitalWrite(MC2, LOW);
-
-  pinMode(BR1, OUTPUT);
-  pinMode(BR2, OUTPUT);
-
-  Wire.begin(I2C_ADR);
-  Wire.onReceive(receiveEvent);
-  Wire.onRequest(requestEvent);
-
-  // set window limits for PID (half of maximum period)
-  acidPID.SetOutputLimits(0, PUMP_PULSE_PERIOD_MS/2);
-  basePID.SetOutputLimits(0, PUMP_PULSE_PERIOD_MS/2);
-
-  // turn on PID
-  acidPID.SetMode(AUTOMATIC);
-  basePID.SetMode(AUTOMATIC);
-
-  // enable turbidity LEDs
-  for(int i=0;i<20;i++)
-    turbLEDs[i] = CRGB::White;
-  FastLED.show();
-
-  // Initialize pressure buffer
-  for(int i = 0; i < PRESSURE_WINDOW_SIZE; i++) {
-    pressureBuffer[i] = 0;
-  }
-
-  delay(2000);
-
-  m1StartTime = millis();
-  m2StartTime = millis();
-}
-
-void loop() {
-  if(!E_STOP){
-    if(DCMT.pulsePump && DCMT.pHSetpoint != 0){   // run as pH controller
-      setPIDTunings();
-      if(DCMT.currentPH >= DCMT.pHSetpoint){
-        // turn off base pump and prevent basePID from updating
-        DCMT.m1OnTime = 0;
-        basePID.SetMode(MANUAL);
-        acidPID.SetMode(AUTOMATIC);
-        acidPID.Compute();  // acid control when pH > setpoint
-      }
-      else{
-        // turn off acid pump and prevent acidPID from updating
-        DCMT.m2OnTime = 0;
-        acidPID.SetMode(MANUAL);
-        basePID.SetMode(AUTOMATIC);
-        basePID.Compute();   // base control when pH < setpoint
-      }
-      actuatePumps();
-    }else if(DCMT.pulsePump && DCMT.pHSetpoint == 0){
-      DCMT.m1Speed = 0;
-      DCMT.m2Speed = 0;   // set motor speeds to 0
-      DCMT.m1OnTime = 0;
-      DCMT.m2OnTime = 0;  // reset PID
-      basePID.SetMode(MANUAL);
-      acidPID.SetMode(MANUAL);
-      actuateMotors();
-    }
-    else if(DCMT.turbPump1 || DCMT.turbPump2){   // run as turbidity pump
-      measureTurbidity();
-    }else{      // run as continuous motor/pump
-      actuateMotors();
-    }
-    
-    measurePressure();  // Measure pressure
-  }
-  printOutput();
-}
-
-void measurePressure() {
-  // Read sensor voltage
-  DCMT.pressureVoltage = analogRead(PRESSURE_PIN) * (5.0 / 1023.0);
-  
-  // Convert to pressure
-  float rawPressure = (DCMT.pressureVoltage - V_min) * (P_max - P_min) / (V_max - V_min);
-  rawPressure = constrain(rawPressure, P_min, P_max);
-  
-  // Update moving average filter
-  pressureBuffer[pressureBufferIndex] = rawPressure;
-  pressureBufferIndex = (pressureBufferIndex + 1) % PRESSURE_WINDOW_SIZE;
-  
-  // Compute smoothed pressure
-  float smoothedPressure = 0;
-  for(int i = 0; i < PRESSURE_WINDOW_SIZE; i++) {
-    smoothedPressure += pressureBuffer[i];
-  }
-  DCMT.currentPressure = smoothedPressure / PRESSURE_WINDOW_SIZE;
-}
-
-void measureTurbidity()
-{
-  if(DCMT.turbPump1){
-    if(turbidityCycle1 == 0 && millis() - lastTurbiditySequence1 >= (DCMT.turbSamplePeriod1 - TURBIDITY_PUMP_TIME_MS - TURBIDITY_SAMPLE_WAIT_MS - TURBIDITY_PUMP_TIME_R_MS))    // wait until its time to take a new sample
-    {
-      lastTurbiditySequence1 = millis();
-      turbidityCycle1++;
-      DCMT.m1Dir = 1;
-      DCMT.m1Speed = TURBIDITY_PUMP_SPEED * 255./100.;
-      Serial.println("Cycling new sample for pump 1...");
-      actuateMotors();
-    }
-    if(turbidityCycle1 == 1 && (millis() - lastTurbiditySequence1 >= TURBIDITY_PUMP_TIME_MS))    // cycle new sample for some time
-    {
-      lastTurbiditySequence1 = millis();
-      turbidityCycle1++;
-      DCMT.m1Speed = 0;   // stop pump until next sample
-      actuateMotors();
-    }
-    if(turbidityCycle1 == 2 && (millis() - lastTurbiditySequence1 >= TURBIDITY_SAMPLE_WAIT_MS)) // wait until bubbles settle and measure
-    {
-      lastTurbiditySequence1 = millis();
-      turbidityCycle1++;
-      DCMT.turbVoltage[0] = analogRead(ENC_B1)*5.0/1023;
-      Serial.println("Sample 1 measured!");
-
-      DCMT.m1Dir = 0;
-      DCMT.m1Speed = TURBIDITY_PUMP_SPEED * 255./100.;
-      actuateMotors();
-      Serial.println("Reversing sample 1...");
-    }
-    if(turbidityCycle1 == 3 && (millis() - lastTurbiditySequence1 >= TURBIDITY_PUMP_TIME_R_MS))    // reverse sample for some time
-    {
-      lastTurbiditySequence1 = millis();
-      turbidityCycle1 = 0;   // back to starting sequence (waiting)
-      DCMT.m1Speed = 0;   // stop pump until next sample
-      actuateMotors();
-    }
-  }
-  if(DCMT.turbPump2){
-    if(turbidityCycle2 == 0 && millis() - lastTurbiditySequence2 >= (DCMT.turbSamplePeriod2 - TURBIDITY_PUMP_TIME_MS - TURBIDITY_SAMPLE_WAIT_MS - TURBIDITY_PUMP_TIME_R_MS))    // wait until its time to take a new sample
-    {
-      lastTurbiditySequence2 = millis();
-      turbidityCycle2++;
-      DCMT.m2Dir = 1;
-      DCMT.m2Speed = TURBIDITY_PUMP_SPEED * 255./100.;
-      Serial.println("Cycling new sample for pump 2...");
-      actuateMotors();
-    }
-    if(turbidityCycle2 == 1 && (millis() - lastTurbiditySequence2 >= TURBIDITY_PUMP_TIME_MS))    // cycle new sample for some time
-    {
-      lastTurbiditySequence2 = millis();
-      turbidityCycle2++;
-      DCMT.m2Speed = 0;   // stop pump until next sample
-      actuateMotors();
-    }
-    if(turbidityCycle2 == 2 && (millis() - lastTurbiditySequence2 >= TURBIDITY_SAMPLE_WAIT_MS)) // wait until bubbles settle and measure
-    {
-      lastTurbiditySequence2 = millis();
-      turbidityCycle2++;
-      DCMT.turbVoltage[1] = analogRead(ENC_B2)*5.0/1023;
-      Serial.println("Sample 2 measured!");
-
-      DCMT.m2Dir = 0;
-      DCMT.m2Speed = TURBIDITY_PUMP_SPEED * 255./100.;
-      actuateMotors();
-      Serial.println("Reversing sample 2...");
-    }
-    if(turbidityCycle2 == 3 && (millis() - lastTurbiditySequence2 >= TURBIDITY_PUMP_TIME_R_MS))    // reverse sample for some time
-    {
-      lastTurbiditySequence2 = millis();
-      turbidityCycle2 = 0;   // back to starting sequence (waiting)
-      DCMT.m2Speed = 0;   // stop pump until next sample
-      actuateMotors();
-    }
-  }
-}
-
-// need to change once biomass is calibrated
-void calculateTurbidity(){
-  float x;
-  if(DCMT.turbVoltage[1] >= 2.5){
-    x = DCMT.turbVoltage[1];
-  }else{
-    x = 2.5;
-  }
-  DCMT.currentTurbidity[1] = (5742.3 - 1120.4*x) * x - 4352.9 - TURBIDITY_OFFSET;
-}
-
-void setPIDTunings()
-{
-  acidPID.SetTunings(DCMT.Kp_pH, DCMT.Ki_pH, DCMT.Kd_pH);
-  basePID.SetTunings(DCMT.Kp_pH, DCMT.Ki_pH, DCMT.Kd_pH);
-}
-
-void actuatePumps()
-{
-  // reset states when pH is set to zero
-  if(DCMT.pHSetpoint == 0){
-    DCMT.m1Speed = 0;
-    DCMT.m2Speed = 0;
-
-    DCMT.m1OnTime = 0;
-    DCMT.m2OnTime = 0;
-  }
-  // Motor 1 (Acid Pump)
-  if (millis() - m1StartTime > PUMP_PULSE_PERIOD_MS)
-  { //time to shift the Relay Window
-    m1StartTime += PUMP_PULSE_PERIOD_MS;
-  }
-  if ((int)(DCMT.m1OnTime) > millis() - m1StartTime)
-  {
-    digitalWrite(BR1, !DCMT.m1En);    // apply brake if enable is FALSE
-    digitalWrite(DIR1, DCMT.m1Dir);
-    analogWrite(MC1, DCMT.m1Speed);
-  }
-  else digitalWrite(BR1, HIGH);   // set brake to stop motor
-
-  // Motor 2 (Base Pump)
-  if (millis() - m2StartTime > PUMP_PULSE_PERIOD_MS)
-  { //time to shift the Relay Window
-    m2StartTime += PUMP_PULSE_PERIOD_MS;
-  }
-  if ((int)(DCMT.m2OnTime) > millis() - m2StartTime)
-  {
-    digitalWrite(BR2, !DCMT.m2En);    // apply brake if enable is FALSE
-    digitalWrite(DIR2, DCMT.m2Dir);
-    analogWrite(MC2, DCMT.m2Speed);
-  }
-  else digitalWrite(BR2, HIGH);   // set brake to stop motor
-}
-
-void printOutput()
-{
-  if(millis() - lastSerialPrint >= SERIAL_UPDATE_TIME_MS)
-  {
-    Serial.print(analogRead(ENC_B1));
-    Serial.print(", ");
-    Serial.print(analogRead(ENC_B2));
-    Serial.print(", Pressure: ");
-    Serial.print(DCMT.currentPressure);
-    Serial.print(" PSI");
-    /*
-    if(DCMT.pulsePump){
-      Serial.print("PID: ");
-      Serial.print(DCMT.Kp_pH);
-      Serial.print(",");
-      Serial.print(DCMT.Ki_pH);
-      Serial.print(",");
-      Serial.print(DCMT.Kd_pH);
-
-      Serial.print("\tpH: ");
-      Serial.print(DCMT.currentPH);
-      Serial.print("\tSetpoint: ");
-      Serial.print(DCMT.pHSetpoint);
-      Serial.print("\tonTime1: ");
-      Serial.print((int)(DCMT.m1OnTime));
-      Serial.print("\tonTime2: ");
-      Serial.print((int)(DCMT.m2OnTime));
-    }else{
-      Serial.print("Motor 1 Speed: ");
-      Serial.print(DCMT.m1Speed);
-      Serial.print("\tDirection: ");
-      Serial.print(DCMT.m1Dir);
-      Serial.print("\tMotor 2 Speed: ");
-      Serial.print(DCMT.m2Speed);
-      Serial.print("\tDirection: ");
-      Serial.print(DCMT.m2Dir);
-      if(DCMT.turbPump1 || DCMT.turbPump2){
-        Serial.print("\tSampleTime1: ");
-        Serial.print(DCMT.turbSamplePeriod1);
-        Serial.print("\tSampleTime2: ");
-        Serial.print(DCMT.turbSamplePeriod2);
-        Serial.print("\tTurbidity1: ");
-        Serial.print(DCMT.turbVoltage[0]);
-        Serial.print("\tTurbidity2: ");
-        Serial.print(DCMT.turbVoltage[1]);
-      }
-    }
-    */
-    Serial.println();
-    lastSerialPrint = millis();
-  }
-}
-
-void actuateMotors()
-{
-  // motor 1
-  digitalWrite(BR1, !DCMT.m1En);    // apply brake if enable is FALSE
-  digitalWrite(DIR1, DCMT.m1Dir);
-  analogWrite(MC1, DCMT.m1Speed);
-    
-  // motor 2
-  digitalWrite(BR2, !DCMT.m2En);    // apply brake if enable is FALSE
-  digitalWrite(DIR2, DCMT.m2Dir);
-  analogWrite(MC2, DCMT.m2Speed);
-}
-
-void requestEvent() {
-  FLOATUNION_t turb1, turb2, pressure;
-
-  if(isnan(DCMT.turbVoltage[0]) || !(DCMT.turbPump1))
-    turb1.number = 0;
-  else
-    turb1.number = DCMT.turbVoltage[0];
-
-  if(isnan(DCMT.turbVoltage[1]) || !(DCMT.turbPump2))
-    turb2.number = 0;
-  else
-    turb2.number = DCMT.turbVoltage[1];
-  
-  // Add pressure data
-  if(isnan(DCMT.currentPressure))
-    pressure.number = 0;
-  else
-    pressure.number = DCMT.currentPressure;
-
-  for (int i = 0; i < 4; i++) Wire.write(turb1.bytes[i]);
-  for (int i = 0; i < 4; i++) Wire.write(turb2.bytes[i]);
-  for (int i = 0; i < 4; i++) Wire.write(pressure.bytes[i]);  // Send pressure
-}
-
-void receiveEvent(int howMany) 
-{
-  byte in_char;
-  char in_data[20];
-
-  led = CRGB::Green;
-  FastLED.show();
-
-  //Serial.println("Receiving: ");
-  int i=0;
-  while(Wire.available())
-  {
-    in_char = Wire.read();
-    in_data[i] = in_char;
-    Serial.print((byte)in_data[i]);
-    Serial.print(",");
-    i++;
-  }
-  Serial.println();
-
-  setParametersDCMT(in_data);
-
-  led = CRGB::Black;
-  FastLED.show();
-}
-
-void setParametersDCMT(char *in_data)
-{
-  INTUNION_t int1, int2, int3;
-
-  FLOATUNION_t float1, float2, float3;
-
-  switch(in_data[0])
-  {
-    case 'M':   // motor edit, disable PID
-      DCMT.pulsePump = false;    // disable pulse behavior
-
-      //DCMT.m1Speed = 0;
-      //DCMT.m2Speed = 0;   // set motor speeds to 0 to reset from PID
-      if(in_data[1] == 1){   // motor 1
-        DCMT.turbPump1 = false;
-        for(int i=0;i<4;i++) int1.bytes[i] = in_data[i+2];
-        if(int1.number >= 0){
-          DCMT.m1Speed = map(int1.number, 0, 100, 0, 255);
-          DCMT.m1Dir = 1;
-        }else{
-          DCMT.m1Speed = map(0-int1.number, 0, 100, 0, 255);
-          DCMT.m1Dir = 0;
+    //----------------Bioreactor thermocouple traces-----------------------//
+    var bio_thermo_traces = [
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Thermocouple 1"
+        },
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Thermocouple 2"
         }
-        if(!E_STOP)
-          DCMT.m1En = in_data[6];
-      }
-      if(in_data[1] == 2){   // motor 2
-        DCMT.turbPump2 = false;
-        for(int i=0;i<4;i++) int1.bytes[i] = in_data[i+2];
-        if(int1.number >= 0){
-          DCMT.m2Speed = map(int1.number, 0, 100, 0, 255);
-          DCMT.m2Dir = 1;
-        }else{
-          DCMT.m2Speed = map(0-int1.number, 0, 100, 0, 255);
-          DCMT.m2Dir = 0;
+    ]
+
+    //----------------Bioreactor pH traces-----------------------//
+    var bio_ph_traces = [
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "pH Sensor 1"
+        },
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "pH Sensor 2"
         }
-        if(!E_STOP)
-          DCMT.m2En = in_data[6];
-      }
-      break;
+    ]
+
+    //----------------Bioreactor dissolved oxygen traces-----------------------//
+    var bio_oxygen_traces = [
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Dissolved O2 1"
+        },
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Dissolved O2 2"
+        }
+    ]
+
+    //----------------Bioreactor turbidity traces-----------------------//
+    var bio_turbidity_traces = [
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Turbidity 1"
+        },
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Turbidity 2"
+        }
+    ]
+
+    //----------------Bioreactor Post Processing traces-----------------------//
+    var bio_pro_traces = [
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Pasteurization"
+        },
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Dryer"
+        }
+    ]
+
+    //----------------Chemreactor thermocouple traces-----------------------//
+    var chem_thermo_traces = [
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Reactor 1"
+        },
+        {
+            y: [],
+            x: [],
+            type: 'scatter',
+            mode: "lines",
+            name: "Reactor 2"
+        }
+    ]
+
+    //----------------Thermocouple graph layout-----------------------//
+    var thermocouple_layout = {
+        title: 'Temperature Data',
+        xaxis: {
+            title: 'Time',
+            autorange: true,
+            rangeselector: {buttons: [
+                {
+                count: 1,
+                label: '1h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 6,
+                label: '6h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 12,
+                label: '12h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 24,
+                label: '24h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {step: 'all'}
+            ]},
+            type: 'date'
+        },
+        yaxis: {
+            title: 'Degrees Celsius'
+        },
+        showlegend: true
+    };
+
+    var bio_thermo_layout = {
+        title: 'Temperature Data',
+        xaxis: {
+            title: 'Time',
+            autorange: true,
+            rangeselector: {buttons: [
+                {
+                count: 1,
+                label: '1h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 6,
+                label: '6h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 12,
+                label: '12h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 24,
+                label: '24h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {step: 'all'}
+            ]},
+            type: 'date'
+        },
+        yaxis: {
+            title: 'Degrees Celsius'
+        },
+        showlegend: true
+    };
+
+    var chem_thermo_layout = {
+        title: 'Temperature Data',
+        xaxis: {
+            title: 'Time',
+            autorange: true,
+            rangeselector: {buttons: [
+                {
+                count: 1,
+                label: '1h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 6,
+                label: '6h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 12,
+                label: '12h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 24,
+                label: '24h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {step: 'all'}
+            ]},
+            type: 'date'
+        },
+        yaxis: {
+            title: 'Degrees Celsius'
+        },
+        showlegend: true
+    };
+
+    //----------------pH graph layout-----------------------//
+    var pH_layout = {
+        title: 'pH Data',
+        xaxis: {
+            title: 'Time',
+            autorange: true,
+            rangeselector: {buttons: [
+                {
+                count: 1,
+                label: '1h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 6,
+                label: '6h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 12,
+                label: '12h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 24,
+                label: '24h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {step: 'all'}
+            ]},
+            type: 'date'
+        },
+        yaxis: {
+            title: 'pH'
+        },
+        showlegend: true
+    };
+
+    //----------------Dissolved oxygen graph layout-----------------------//
+    var oxygen_layout = {
+        title: 'Dissolved Oxygen Data',
+        xaxis: {
+            title: 'Time',
+            autorange: true,
+            rangeselector: {buttons: [
+                {
+                count: 1,
+                label: '1h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 6,
+                label: '6h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 12,
+                label: '12h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 24,
+                label: '24h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {step: 'all'}
+            ]},
+            type: 'date'
+        },
+        yaxis: {
+            title: 'Dissolved Oxygen (mL)'
+        },
+        showlegend: true
+    };
+
+    //----------------Turbidity graph layout-----------------------//
+    var turbidity_layout = {
+        title: 'Turbidity Data',
+        xaxis: {
+            title: 'Time',
+            autorange: true,
+            rangeselector: {buttons: [
+                {
+                count: 1,
+                label: '1h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 6,
+                label: '6h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 12,
+                label: '12h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 24,
+                label: '24h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {step: 'all'}
+            ]},
+            type: 'date'
+        },
+        yaxis: {
+            title: 'Turbidity (NTU)'
+        },
+        showlegend: true
+    };
+
+    //----------------Post Processing graph layout-----------------------//
+    var pro_layout = {
+        title: 'Post Processing Data',
+        xaxis: {
+            title: 'Time',
+            autorange: true,
+            rangeselector: {buttons: [
+                {
+                count: 1,
+                label: '1h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 6,
+                label: '6h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 12,
+                label: '12h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {
+                count: 24,
+                label: '24h',
+                step: 'hour',
+                stepmode: 'backward'
+                },
+                {step: 'all'}
+            ]},
+            type: 'date'
+        },
+        yaxis: {
+            title: 'Degrees Celsius'
+        },
+        showlegend: true
+    };
+
+    //----------------Standard Gauge Layout-----------------------//
+    var gaugeLayout = { width: 270, height: 220, margin: { t: 0, b: 0, l: 40, r: 40} };
+
+    //----------------Thermocouple Gauge-----------------------//
+    var thermo_gauge = [{
+        domain: { x: [0, 1], y: [0, 1] },
+        value: 0,
+        title: { text: "" },
+        type: "indicator",
+        mode: "gauge+number",
+        delta: { reference: 200 },
+        number: {'valueformat':'.1f'},
+        gauge: {
+            axis: { range: [null, 400] },
+            bar: { color: "blue" },
+            steps: [
+                { range: [0, 400], color: "#dddddd" },
+                { range: [145, 155], color: "yellow" },
+                { range: [195, 205], color: "green" },
+                { range: [245, 255], color: "red" }
+            ],
+        }
+    }];
+
+    var thermo_bio_gauge = [{
+        domain: { x: [0, 1], y: [0, 1] },
+        value: 0,
+        title: { text: "" },
+        type: "indicator",
+        mode: "gauge+number",
+        delta: { reference: 200 },
+        number: {'valueformat':'.1f'},
+        gauge: {
+            axis: { range: [null, 400] },
+            bar: { color: "blue" },
+            steps: [
+                { range: [0, 400], color: "#dddddd" },
+            ],
+        }
+    }];
+
+    //----------------pH Gauge-----------------------//
+    var pH_gauge = [{
+        domain: { x: [0, 1], y: [0, 1] },
+        value: 0,
+        title: { text: "" },
+        type: "indicator",
+        mode: "gauge+number",
+        delta: { reference: 7},
+        number: {'valueformat':'.2f'},
+        gauge: {
+            axis: { range: [null, 14] },
+            bar: { color: "green" },
+            steps: [
+                { range: [0, 14], color: "#dddddd" },
+            ],
+            threshold: {
+                line: { color: "red", width: 4 },
+                thickness: 0.75,
+                value: 7
+            }
+        }
+    }];
+
+	//----------------Pressure Gauge-----------------------//
+	var pressure_gauge = [{
+		domain: { x: [0, 1], y: [0, 1] },
+		value: 0,
+		title: { text: "" },
+		type: "indicator",
+		mode: "gauge+number",
+		delta: { reference: 50 },
+		number: {'valueformat':'.1f'},
+		gauge: {
+			axis: { range: [null, 100] },
+			bar: { color: "blue" },
+			steps: [
+				{ range: [0, 100], color: "#dddddd" },
+			],
+			threshold: {
+                line: { color: "red", width: 4 },
+                thickness: 0.75,
+                value: 14
+            }
+		}
+	}];
+
+    //----------------Dissolved Oxygen Gauge-----------------------//
+    var oxygen_gauge = [{
+        domain: { x: [0, 1], y: [0, 1] },
+        value: 0,
+        title: { text: "" },
+        type: "indicator",
+        mode: "gauge+number",
+        delta: { reference: 50 },
+        number: {'valueformat':'.2f'},
+        gauge: {
+            axis: { range: [null, 100] },
+            bar: { color: "green" },
+            steps: [
+                { range: [0, 100], color: "#dddddd" },
+            ],
+        }
+    }];
+
+    //----------------Turbidity Gauge-----------------------//
+    var turbidity_gauge = [{
+        domain: { x: [0, 1], y: [0, 1] },
+        value: 0,
+        title: { text: "" },
+        type: "indicator",
+        mode: "gauge+number",
+        delta: { reference: 1 },
+        number: {'valueformat':'.2f'},
+        gauge: {
+            axis: { range: [null, 6] },
+            bar: { color: "green" },
+            steps: [
+                { range: [0, 6], color: "#dddddd" },
+            ],
+        }
+    }];
+
+    //----------------Motor Gauge-----------------------//
+    var motor_gauge = [{
+        domain: { x: [0, 1], y: [0, 1] },
+        value: 0,
+        title: { text: "" },
+        type: "indicator",
+        mode: "gauge+number",
+        delta: { reference: 50 },
+        gauge: {
+            axis: { range: [null, 100] },
+            bar: { color: "green" },
+            steps: [
+                { range: [0, 100], color: "#dddddd" },
+            ],
+        }
+    }];
+
+    //----------------Pyrolysis Gauges-----------------------//
+    var pyrolysisGaugeInfo = {
+        "pyrolysis-thermo-gauge1": {
+            title: "Dissolution Tank",
+            setpoint: 200,
+            value: 0,
+        },
+        "pyrolysis-thermo-gauge2": {
+            title: "Valve",
+            setpoint: 200,
+            value: 0,
+        },
+        "pyrolysis-thermo-gauge3": {
+            title: "Char Chamber",
+            setpoint: 200,
+            value: 0,
+        },
+        "pyrolysis-thermo-gauge4": {
+            title: "Secondary Reactor",
+            setpoint: 200,
+            value: 0,
+        },
+        "pyrolysis-thermo-gauge5": {
+            title: "Knockout Drum",
+            setpoint: 200,
+            value: 0,
+        },
+        "pyrolysis-thermo-gauge6": {
+            title: "Condenser 0 Heater",
+            setpoint: 200,
+            value: 0,
+        },
+        "pyrolysis-thermo-gauge7": {
+            title: "Condenser 0 Fan",
+            setpoint: 200,
+            value: 0,
+        },
+        "pyrolysis-thermo-gauge8": {
+            title: "Condenser 1 Heater",
+            setpoint: 200,
+            value: 0,
+        },
+        "pyrolysis-thermo-gauge9": {
+            title: "Condenser 1 Fan",
+            setpoint: 200,
+            value: 0,
+        },
+        "pyrolysis-thermo-gauge10": {
+            title: "Condenser 2 Fan",
+            setpoint: 200,
+            value: 0,
+        },
+    }
+
+    // Get the element with id="defaultOpen" and click on it
+    document.getElementById("defaultOpen").click();
+
+    //create new gauge plots
+    Plotly.newPlot('pyrolysis-thermo-gauge1', thermo_gauge, gaugeLayout);
+    Plotly.newPlot('pyrolysis-thermo-gauge2', thermo_gauge, gaugeLayout);
+    Plotly.newPlot('pyrolysis-thermo-gauge3', thermo_gauge, gaugeLayout);
+    Plotly.newPlot('pyrolysis-thermo-gauge4', thermo_gauge, gaugeLayout);
+    Plotly.newPlot('pyrolysis-thermo-gauge5', thermo_gauge, gaugeLayout);
+    Plotly.newPlot('pyrolysis-thermo-gauge6', thermo_gauge, gaugeLayout);
+    Plotly.newPlot('pyrolysis-thermo-gauge7', thermo_gauge, gaugeLayout);
+    Plotly.newPlot('pyrolysis-thermo-gauge8', thermo_gauge, gaugeLayout);
+    Plotly.newPlot('pyrolysis-thermo-gauge9', thermo_gauge, gaugeLayout);
+    Plotly.newPlot('pyrolysis-thermo-gauge10', thermo_gauge, gaugeLayout);
+
+    //adjust titles
+    Plotly.restyle('pyrolysis-thermo-gauge1', {title: pyrolysisGaugeInfo['pyrolysis-thermo-gauge1'].title})
+    Plotly.restyle('pyrolysis-thermo-gauge2', {title: pyrolysisGaugeInfo['pyrolysis-thermo-gauge2'].title})
+    Plotly.restyle('pyrolysis-thermo-gauge3', {title: pyrolysisGaugeInfo['pyrolysis-thermo-gauge3'].title})
+    Plotly.restyle('pyrolysis-thermo-gauge4', {title: pyrolysisGaugeInfo['pyrolysis-thermo-gauge4'].title})
+    Plotly.restyle('pyrolysis-thermo-gauge5', {title: pyrolysisGaugeInfo['pyrolysis-thermo-gauge5'].title})
+    Plotly.restyle('pyrolysis-thermo-gauge6', {title: pyrolysisGaugeInfo['pyrolysis-thermo-gauge6'].title})
+    Plotly.restyle('pyrolysis-thermo-gauge7', {title: pyrolysisGaugeInfo['pyrolysis-thermo-gauge7'].title})
+    Plotly.restyle('pyrolysis-thermo-gauge8', {title: pyrolysisGaugeInfo['pyrolysis-thermo-gauge8'].title})
+    Plotly.restyle('pyrolysis-thermo-gauge9', {title: pyrolysisGaugeInfo['pyrolysis-thermo-gauge9'].title})
+    Plotly.restyle('pyrolysis-thermo-gauge10', {title: pyrolysisGaugeInfo['pyrolysis-thermo-gauge10'].title})
+
+    //----------------Bioreactor Gauges-----------------------//
+    var bioGaugeInfo = {
+        "bio-thermo-gauge1": {
+            title: "Thermocouple 1",
+            value: 0,
+        },
+        "bio-ph-gauge1": {
+            title: "pH Sensor 1",
+            value: 0,
+            setpoint: 0,
+        },
+        "bio-oxygen-gauge1": {
+            title: "Dissolved Oxygen 1",
+            value: 0,
+        },
+        "bio-turbidity-gauge1": {
+            title: "Turbidity 1",
+            value: 0,
+        },
+        "bio-thermo-gauge2": {
+            title: "Thermocouple 2",
+            value: 0,
+        },
+        "bio-ph-gauge2": {
+            title: "pH Sensor 2",
+            value: 0,
+            setpoint: 0,
+        },
+        "bio-oxygen-gauge2": {
+            title: "Dissolved Oxygen 2",
+            value: 0,
+        },
+        "bio-turbidity-gauge2": {
+            title: "Turbidity 2",
+            value: 0,
+        },
+        "bio-pro-gauge1": {
+            title: "Pasteurization",
+            value: 0,
+        },
+        "bio-pro-gauge2": {
+            title: "Dryer",
+            value: 0,
+        },
+    }
+    var motorGaugeInfo = {
+        "bio-stirring-gauge1": {
+            title: "Stirring Motor 1",
+        },
+        "bio-pump1-gauge1": {
+            title: "Base Pump 1",
+        },
+        "bio-pump2-gauge1": {
+            title: "Acid Pump 1",
+        },
+        "bio-pump3-gauge1": {
+            title: "Water Pump",
+        },
+        "bio-pump4-gauge1": {
+            title: "Spent Media Pump",
+        },
+        "bio-stirring-gauge2": {
+            title: "Stirring Motor 2",
+        },
+        "bio-pump1-gauge2": {
+            title: "Base Pump 2",
+        },
+        "bio-pump2-gauge2": {
+            title: "Acid Pump 2",
+        },
+        "bio-pump3-gauge2": {
+            title: "Harvest Pump",
+        },
+        "bio-pump4-gauge2": {
+            title: "TFF Pump",
+        },
+        "chem-pump1-gauge1": {
+            title: "Ammon. Hydrox. Loading"
+        },
+        "chem-pump2-gauge1": {
+            title: "Liquid Transfer"
+        },
+        "chem-pump3-gauge1": {
+            title: "Water Dilute"
+        },
+        "chem-pump4-gauge1": {
+            title: "Reactor Wash"
+        },
+	"seq-test-input-pump": {
+		title: "Water Pump"
+	},
+	"seq-test-stirring2": {
+		title: "Stirring Motor 2"
+	},
+	"seq-test-output-pump": {
+		title: "Harvest Pump"
+	},
+	"seq-prac-stirring2": {
+		title: "Stirring Motor 2"
+	}
+    }
+    //create new gauge plots
+    Plotly.newPlot('bio-thermo-gauge1', thermo_bio_gauge, gaugeLayout);
+    Plotly.newPlot('bio-thermo-gauge2', thermo_bio_gauge, gaugeLayout);
+
+    Plotly.newPlot('bio-ph-gauge1', pH_gauge, gaugeLayout);
+    Plotly.newPlot('bio-ph-gauge2', pH_gauge, gaugeLayout);
+
+    Plotly.newPlot('bio-oxygen-gauge1', oxygen_gauge, gaugeLayout);
+    Plotly.newPlot('bio-oxygen-gauge2', oxygen_gauge, gaugeLayout);
+
+    Plotly.newPlot('bio-turbidity-gauge1', turbidity_gauge, gaugeLayout);
+    Plotly.newPlot('bio-turbidity-gauge2', turbidity_gauge, gaugeLayout);
+
+    Plotly.newPlot("bio-stirring-gauge1", motor_gauge, gaugeLayout);
+    Plotly.newPlot("bio-stirring-gauge2", motor_gauge, gaugeLayout);
+
+    Plotly.newPlot("bio-pump1-gauge1", motor_gauge, gaugeLayout);
+    Plotly.newPlot("bio-pump2-gauge1", motor_gauge, gaugeLayout);
+    Plotly.newPlot("bio-pump3-gauge1", motor_gauge, gaugeLayout);
+    Plotly.newPlot("bio-pump4-gauge1", motor_gauge, gaugeLayout);
+    Plotly.newPlot("bio-pump1-gauge2", motor_gauge, gaugeLayout);
+    Plotly.newPlot("bio-pump2-gauge2", motor_gauge, gaugeLayout);
+    Plotly.newPlot("bio-pump3-gauge2", motor_gauge, gaugeLayout);
+    Plotly.newPlot("bio-pump4-gauge2", motor_gauge, gaugeLayout);
+
+    Plotly.newPlot('bio-pro-gauge1', thermo_gauge, gaugeLayout);
+    Plotly.newPlot('bio-pro-gauge2', thermo_gauge, gaugeLayout);
+
+    //restyle
+    Plotly.restyle('bio-thermo-gauge1', {title: bioGaugeInfo["bio-thermo-gauge1"].title})
+    Plotly.restyle('bio-thermo-gauge2', {title: bioGaugeInfo["bio-thermo-gauge2"].title})
+    Plotly.restyle('bio-ph-gauge1', {title: bioGaugeInfo["bio-ph-gauge1"].title})
+    Plotly.restyle('bio-ph-gauge2', {title: bioGaugeInfo["bio-ph-gauge2"].title})
+    Plotly.restyle('bio-oxygen-gauge1', {title: bioGaugeInfo["bio-oxygen-gauge1"].title})
+    Plotly.restyle('bio-oxygen-gauge2', {title: bioGaugeInfo["bio-oxygen-gauge2"].title})
+    Plotly.restyle('bio-turbidity-gauge1', {title: bioGaugeInfo["bio-turbidity-gauge1"].title})
+    Plotly.restyle('bio-turbidity-gauge2', {title: bioGaugeInfo["bio-turbidity-gauge2"].title})
+
+    Plotly.restyle("bio-stirring-gauge1", {title: motorGaugeInfo["bio-stirring-gauge1"].title})
+    Plotly.restyle("bio-stirring-gauge2", {title: motorGaugeInfo["bio-stirring-gauge2"].title})
+
+    Plotly.restyle("bio-pump1-gauge1", {title: motorGaugeInfo["bio-pump1-gauge1"].title})
+    Plotly.restyle("bio-pump2-gauge1", {title: motorGaugeInfo["bio-pump2-gauge1"].title})
+    Plotly.restyle("bio-pump3-gauge1", {title: motorGaugeInfo["bio-pump3-gauge1"].title})
+    Plotly.restyle("bio-pump4-gauge1", {title: motorGaugeInfo["bio-pump4-gauge1"].title})
+
+    Plotly.restyle("bio-pump1-gauge2", {title: motorGaugeInfo["bio-pump1-gauge2"].title})
+    Plotly.restyle("bio-pump2-gauge2", {title: motorGaugeInfo["bio-pump2-gauge2"].title})
+    Plotly.restyle("bio-pump3-gauge2", {title: motorGaugeInfo["bio-pump3-gauge2"].title})
+    Plotly.restyle("bio-pump4-gauge2", {title: motorGaugeInfo["bio-pump4-gauge2"].title})
+
+    Plotly.restyle('bio-pro-gauge1', {title: bioGaugeInfo["bio-pro-gauge1"].title})
+    Plotly.restyle('bio-pro-gauge2', {title: bioGaugeInfo["bio-pro-gauge2"].title})
+
+    //----------------Chemreactor Gauges-----------------------//
+    var chemGaugeInfo = {
+        "chem-thermo-gauge1": {
+            title: "Reactor 1",
+            value: 0,
+            setpoint: 0
+        },
+        "chem-thermo-gauge2": {
+            title: "Reactor 2",
+            value: 0,
+            setpoint: 0
+        } 
+    }
+    Plotly.newPlot("chem-thermo-gauge1", thermo_gauge, gaugeLayout);
+    Plotly.newPlot("chem-thermo-gauge2", thermo_gauge, gaugeLayout);
+
+    Plotly.newPlot("chem-pump1-gauge1", motor_gauge, gaugeLayout);
+    Plotly.newPlot("chem-pump2-gauge1", motor_gauge, gaugeLayout);
+    Plotly.newPlot("chem-pump3-gauge1", motor_gauge, gaugeLayout);
+    Plotly.newPlot("chem-pump4-gauge1", motor_gauge, gaugeLayout);
+
+    Plotly.restyle('chem-thermo-gauge1', {title: chemGaugeInfo["chem-thermo-gauge1"].title})
+    Plotly.restyle('chem-thermo-gauge2', {title: chemGaugeInfo["chem-thermo-gauge2"].title})
+
+    Plotly.restyle('chem-pump1-gauge1', {title: motorGaugeInfo["chem-pump1-gauge1"].title})
+    Plotly.restyle('chem-pump2-gauge1', {title: motorGaugeInfo["chem-pump2-gauge1"].title})
+    Plotly.restyle('chem-pump3-gauge1', {title: motorGaugeInfo["chem-pump3-gauge1"].title})
+    Plotly.restyle('chem-pump4-gauge1', {title: motorGaugeInfo["chem-pump4-gauge1"].title})
+
+
+		//----------------Sequencing Gauges-----------------------//
+	// Testing section pump gauges
+	Plotly.newPlot("seq-test-input-pump", motor_gauge, gaugeLayout);
+	Plotly.newPlot("seq-test-stirring2", motor_gauge, gaugeLayout);
+	Plotly.newPlot("seq-test-output-pump", motor_gauge, gaugeLayout);
+	   
+	Plotly.restyle("seq-test-input-pump", {title: "Water Pump"});
+	Plotly.restyle("seq-test-stirring2", {title: "Stirring Motor 2"});
+	Plotly.restyle("seq-test-output-pump", {title: "Harvest Pump"});
+		
+	// Practical section gauges
+	Plotly.newPlot('seq-prac-thermo1', thermo_bio_gauge, gaugeLayout);
+	Plotly.newPlot('seq-prac-ph2', pH_gauge, gaugeLayout);
+	Plotly.newPlot('seq-prac-oxygen1', oxygen_gauge, gaugeLayout);
+	Plotly.newPlot('seq-prac-turbidity1', turbidity_gauge, gaugeLayout);
+	Plotly.newPlot("seq-prac-stirring2", motor_gauge, gaugeLayout);
+	Plotly.newPlot("seq-prac-base-pump1", motor_gauge, gaugeLayout);
+	Plotly.newPlot("seq-prac-acid-pump1", motor_gauge, gaugeLayout);
+	Plotly.newPlot("seq-prac-water-pump", motor_gauge, gaugeLayout);
+	Plotly.newPlot("seq-prac-harvest-pump", motor_gauge, gaugeLayout);
+	Plotly.newPlot('seq-prac-pressure', pressure_gauge, gaugeLayout);
+
+	// Set titles
+	Plotly.restyle('seq-prac-thermo1', {title: "Thermocouple 1"});
+	Plotly.restyle('seq-prac-ph2', {title: "pH Sensor 2"});
+	Plotly.restyle('seq-prac-oxygen1', {title: "Dissolved Oxygen 1"});
+	Plotly.restyle('seq-prac-turbidity1', {title: "Turbidity 1"});
+	Plotly.restyle("seq-prac-stirring2", {title: "Stirring Motor 2"});
+	Plotly.restyle("seq-prac-base-pump1", {title: "Base Pump 1"});
+	Plotly.restyle("seq-prac-acid-pump1", {title: "Acid Pump 1"});
+	Plotly.restyle("seq-prac-water-pump", {title: "Water Pump"});
+	Plotly.restyle("seq-prac-harvest-pump", {title: "Harvest Pump"});
+	Plotly.restyle('seq-prac-pressure', {title: "System Pressure (PSI)"});
+
+	//----------------Sequencing Control Variables-----------------------//
+	var testSequenceActive = false;
+	var pracSequenceActive = false;
+	var testSequenceTimer = null;
+	var pracSequenceTimer = null;
+	var testSequenceState = {
+		currentCycle: 0,
+		totalCycles: 0,
+		currentStep: 'idle',
+		timeRemaining: 0
+	};
+	var pracSequenceState = {
+		currentCycle: 0,
+		totalCycles: 0,
+		currentStep: 'idle',
+		timeRemaining: 0
+	};
+
+	//----------------Sequencing Functions-----------------------//
+	function formatTime(seconds) {
+		const hours = Math.floor(seconds / 3600);
+		const minutes = Math.floor((seconds % 3600) / 60);
+		const secs = seconds % 60;
+		return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+	}
+
+	function getTimeInSeconds(hoursId, minutesId, secondsId) {
+		const hours = parseInt(document.getElementById(hoursId).value) || 0;
+		const minutes = parseInt(document.getElementById(minutesId).value) || 0;
+		const seconds = parseInt(document.getElementById(secondsId).value) || 0;
+		return (hours * 3600) + (minutes * 60) + seconds;
+	}
+
+	function updateTestingDisplay() {
+		document.getElementById('test-current-cycle').textContent = testSequenceState.currentCycle;
+		document.getElementById('test-total-cycles').textContent = testSequenceState.totalCycles;
+		document.getElementById('test-current-step').textContent = testSequenceState.currentStep;
+		document.getElementById('test-time-remaining').textContent = formatTime(testSequenceState.timeRemaining);
+	}
+
+	function updatePracticalDisplay() {
+		document.getElementById('prac-current-cycle').textContent = pracSequenceState.currentCycle;
+		document.getElementById('prac-total-cycles').textContent = pracSequenceState.totalCycles;
+		document.getElementById('prac-current-step').textContent = pracSequenceState.currentStep;
+		document.getElementById('prac-time-remaining').textContent = formatTime(pracSequenceState.timeRemaining);
+	}
+
+	function startTestingSequence() {
+		if (testSequenceActive || pracSequenceActive) return;
+		
+		testSequenceActive = true;
+		testSequenceState.currentCycle = 1;
+		testSequenceState.totalCycles = parseInt(document.getElementById('test-num-cycles').value);
+		
+		// Disable practical mode button
+		document.getElementById('prac-start-btn').disabled = true;
+		document.getElementById('prac-start-btn').style.opacity = '0.5';
+		document.getElementById('prac-start-btn').style.cursor = 'not-allowed';
+		
+		document.getElementById('test-sequence-status').textContent = 'Running';
+		runTestingCycle();
+	}
+
+	function runTestingCycle() {
+		if (!testSequenceActive) return;
+		
+		// Step 1: Load reactor (Feed pump)
+		testSequenceState.currentStep = 'Loading Reactor';
+		testSequenceState.timeRemaining = getTimeInSeconds('test-feed-hours', 'test-feed-minutes', 'test-feed-seconds');
+		
+		// Check if time is valid
+		if (testSequenceState.timeRemaining <= 0) {
+			console.log('Invalid feed time, skipping to growth phase');
+			runGrowthPhase();
+			return;
+		}
+		
+		updateTestingDisplay();
+		
+		// Activate input pump
+		console.log('Activating water pump for', testSequenceState.timeRemaining, 'seconds');
+		setGaugeValue(80, 'seq-test-input-pump');
+		
+		testSequenceTimer = setInterval(() => {
+			testSequenceState.timeRemaining--;
+			updateTestingDisplay();
+			
+			if (testSequenceState.timeRemaining <= 0) {
+				clearInterval(testSequenceTimer);
+				console.log('Feed phase complete, turning off pump');
+				setGaugeValue(0, 'seq-test-input-pump');
+				setTimeout(() => runGrowthPhase(), 500); // Small delay before next phase
+			}
+		}, 1000);
+	}
+
+	function runGrowthPhase() {
+		if (!testSequenceActive) return;
+		
+		// Step 2: Growth phase (Stirring active)
+		testSequenceState.currentStep = 'Growth Phase';
+		testSequenceState.timeRemaining = getTimeInSeconds('test-growth-hours', 'test-growth-minutes', 'test-growth-seconds');
+		
+		// Check if time is valid
+		if (testSequenceState.timeRemaining <= 0) {
+			console.log('Invalid growth time, skipping to harvest phase');
+			runHarvestPhase();
+			return;
+		}
+		
+		updateTestingDisplay();
+		
+		// Activate stirring motor 2
+		console.log('Activating stirring motor for', testSequenceState.timeRemaining, 'seconds');
+		setGaugeValue(50, 'seq-test-stirring2');
+		
+		testSequenceTimer = setInterval(() => {
+			testSequenceState.timeRemaining--;
+			updateTestingDisplay();
+			
+			if (testSequenceState.timeRemaining <= 0) {
+				clearInterval(testSequenceTimer);
+				console.log('Growth phase complete, turning off stirring');
+				setGaugeValue(0, 'seq-test-stirring2');
+				setTimeout(() => runHarvestPhase(), 500); // Small delay before next phase
+			}
+		}, 1000);
+	}
+
+	function runHarvestPhase() {
+		if (!testSequenceActive) return;
+		
+		// Step 3: Harvest (Output pump)
+		testSequenceState.currentStep = 'Harvesting';
+		testSequenceState.timeRemaining = getTimeInSeconds('test-harvest-hours', 'test-harvest-minutes', 'test-harvest-seconds');
+		
+		// Check if time is valid
+		if (testSequenceState.timeRemaining <= 0) {
+			console.log('Invalid harvest time, completing cycle');
+			completeCycle();
+			return;
+		}
+		
+		updateTestingDisplay();
+		
+		// Activate output pump
+		console.log('Activating harvest pump for', testSequenceState.timeRemaining, 'seconds');
+		setGaugeValue(80, 'seq-test-output-pump');
+		
+		testSequenceTimer = setInterval(() => {
+			testSequenceState.timeRemaining--;
+			updateTestingDisplay();
+			
+			if (testSequenceState.timeRemaining <= 0) {
+				clearInterval(testSequenceTimer);
+				console.log('Harvest phase complete, turning off pump');
+				setGaugeValue(0, 'seq-test-output-pump');
+				setTimeout(() => completeCycle(), 500); // Small delay before next cycle
+			}
+		}, 1000);
+	}
+
+	function completeCycle() {
+		// Check if we need to loop
+		if (testSequenceState.currentCycle < testSequenceState.totalCycles) {
+			console.log('Cycle', testSequenceState.currentCycle, 'complete. Starting cycle', testSequenceState.currentCycle + 1);
+			testSequenceState.currentCycle++;
+			setTimeout(() => runTestingCycle(), 1000); // Small delay between cycles
+		} else {
+			console.log('All cycles complete!');
+			stopTestingSequence();
+		}
+	}
+
+	function stopTestingSequence() {
+		testSequenceActive = false;
+		clearInterval(testSequenceTimer);
+		
+		// Turn off all pumps and motors
+		setGaugeValue(0, 'seq-test-input-pump');
+		setGaugeValue(0, 'seq-test-output-pump');
+		setGaugeValue(0, 'seq-test-stirring2');
+		
+		// Reset display
+		testSequenceState.currentStep = 'Idle';
+		testSequenceState.timeRemaining = 0;
+		document.getElementById('test-sequence-status').textContent = 'Idle';
+		updateTestingDisplay();
+		
+		// Re-enable practical mode button
+		document.getElementById('prac-start-btn').disabled = false;
+		document.getElementById('prac-start-btn').style.opacity = '1';
+		document.getElementById('prac-start-btn').style.cursor = 'pointer';
+	}
+
+	function startPracticalSequence() {
+		if (testSequenceActive || pracSequenceActive) return;
+		
+		pracSequenceActive = true;
+		
+		// Disable testing mode button
+		document.getElementById('test-start-btn').disabled = true;
+		document.getElementById('test-start-btn').style.opacity = '0.5';
+		document.getElementById('test-start-btn').style.cursor = 'not-allowed';
+		
+		document.getElementById('prac-sequence-status').textContent = 'Running';
+		
+		// TODO: Implement practical sequence logic
+		alert('Practical sequence not yet implemented');
+	}
+
+	function stopPracticalSequence() {
+		pracSequenceActive = false;
+		clearInterval(pracSequenceTimer);
+		
+		// Reset display
+		pracSequenceState.currentStep = 'Idle';
+		pracSequenceState.timeRemaining = 0;
+		document.getElementById('prac-sequence-status').textContent = 'Idle';
+		updatePracticalDisplay();
+		
+		// Re-enable testing mode button
+		document.getElementById('test-start-btn').disabled = false;
+		document.getElementById('test-start-btn').style.opacity = '1';
+		document.getElementById('test-start-btn').style.cursor = 'pointer';
+	}
+
+
+    //--------------------------------------------------------------------------//
+
+    function loadData() {
+        //Get Data	
+        fetch('pyrolysis-data.csv') 
+        .then(response => response.text())
+        .then(text => {
+            let row = text.split("\r\n") //split entries by row
+
+            for(let n = 1; n < row.length; n++) {
+                let data = row[n].split(',')
+                for(let x = 0; x < pyrolysis_traces.length; x++) {
+                    pyrolysis_traces[x].x.push(data[0])     //data[0] pushes time to the x axis
+                    pyrolysis_traces[x].y.push(data[x+1])   //data[x+1] to avoid pushing the date and time
+                }
+            }
+
+            //Plot data
+            Plotly.newPlot('pyrolysis-thermo-graph', pyrolysis_traces, thermocouple_layout, {scrollZoom: true});                                
+        })
+
+        //load bioreactor data
+        fetch('bioreactor-data.csv')
+        .then(response => response.text())
+        .then(text => {
+            let row = text.split("\r\n") //split entries by row
+
+            for(let n = 1; n < row.length; n++) {
+                let data = row[n].split(',')
+                for(let x = 0; x < 2; x++) {
+                    bio_thermo_traces[x].x.push(data[0])    //data[0] pushes time to the x axis
+                    bio_ph_traces[x].x.push(data[0])        
+                    bio_oxygen_traces[x].x.push(data[0])
+                    bio_turbidity_traces[x].x.push(data[0])
+                    bio_pro_traces[x].x.push(data[0])
+                    
+                    bio_thermo_traces[x].y.push(data[x*4+1]) 
+                    bio_ph_traces[x].y.push(data[x*4+2])    
+                    bio_oxygen_traces[x].y.push(data[x*4+3]) 
+                    bio_turbidity_traces[x].y.push(data[x*4+4]) 
+                    bio_pro_traces[x].y.push(data[x+9]) 
+                }
+            }
+
+            //Plot data
+            Plotly.newPlot('bio-thermo-graph', bio_thermo_traces, bio_thermo_layout, {scrollZoom: true});                    
+            Plotly.newPlot('bio-ph-graph', bio_ph_traces, pH_layout, {scrollZoom: true});
+            Plotly.newPlot('bio-oxygen-graph', bio_oxygen_traces, oxygen_layout, {scrollZoom: true});
+            Plotly.newPlot('bio-turbidity-graph', bio_turbidity_traces, turbidity_layout, {scrollZoom: true});
+            Plotly.newPlot('bio-pro-graph', bio_pro_traces, pro_layout, {scrollZoom: true});
+        })
+
+        //load chemreactor data
+        fetch('chemreactor-data.csv')
+        .then(response => response.text())
+        .then(text => {
+            let row = text.split("\r\n") //split entries by row
+            for(let n = 1; n < row.length; n++) {
+                let data = row[n].split(',')
+                for(let x = 0; x < 2; x++) {
+                    chem_thermo_traces[x].x.push(data[0])
+                    chem_thermo_traces[x].y.push(data[x+1])
+                }
+            }
+            Plotly.newPlot('chem-thermo-graph', chem_thermo_traces, chem_thermo_layout, {scrollZoom: true});
+        })
+
+
+        //send time to ESP32
+        var now = new Date();
+        var rtcTime = now.toLocaleTimeString('en-US', {hour12: false}).split(":")
+        rtcTime[2] = parseInt(rtcTime[2])
+        var rtcDate = now.toLocaleDateString().split("/")
+        fetch(window.location.href + "get-variables", {
+            method: "POST",
+            headers: {
+            'Content-Type': 'text/plain',
+            },
+            body: rtcTime[2]+","+rtcTime[1]+","+rtcTime[0]+","+rtcDate[1]+","+rtcDate[0]+","+rtcDate[2],
+        })
+        .then(response => response.text()) // Get the response as text
+        .then(textData => {
+            let sections = textData.split('-')
+            if(sections[0] == "logging") {
+                logging = true;
+                document.getElementById("run").textContent = "Logging Data..."
+            } else if(sections[0] == "not logging") {
+                logging = false;
+                document.getElementById("run").textContent = "Start Logging Data"
+            }
+
+            // load previous control parameters
+            console.log('Control Parameters: ', sections)
+
+            let pyrolysis = sections[1].split(',')
+            for(let x = 0; x < pyrolysis.length; x++) {
+                //p[0] setpoint, p[1] Kp, p[2] Ki, p[3] Kd
+                let p = pyrolysis[x].split('|')
+                let id = "pyrolysis-thermo-gauge" + (x+1)
+                document.getElementById(id + "-amount").value = p[0]
+                pyrolysisGaugeInfo[id].setpoint = p[0]
+                document.getElementById(id + "-kp").value = p[1]
+                document.getElementById(id + "-ki").value = p[2]
+                document.getElementById(id + "-kd").value = p[3]
+                updatePyrolysisGauge(id)
+            }
+
+            let bioPh = sections[2].split(',')
+            for(let x = 0; x < bioPh.length; x++) {
+                let b = bioPh[x].split('|')
+                let id = "bio-ph-gauge" + (x+1)
+                document.getElementById(id + "-amount").value = b[0]
+                bioGaugeInfo[id].setpoint = b[0]
+                document.getElementById(id + "-kp").value = b[1]
+                document.getElementById(id + "-ki").value = b[2]
+                document.getElementById(id + "-kd").value = b[3]
+                updateBioPhGauge(id)
+            }
+
+            let turb = sections[3].split(',')
+            document.getElementById("bio-turbidity-gauge1-amount").value = turb[0]
+            document.getElementById("bio-turbidity-gauge2-amount").value = turb[1]
+            Plotly.restyle('bio-turbidity-gauge1', {title: bioGaugeInfo["bio-turbidity-gauge1"].title, value: turb[0]})
+            Plotly.restyle('bio-turbidity-gauge2', {title: bioGaugeInfo["bio-turbidity-gauge2"].title, value: turb[1]})
+
+            let bioPro = sections[4].split(',')
+            for(let x = 0; x < bioPro.length; x++) {
+                let b = bioPro[x].split('|')
+                let id = "bio-pro-gauge" + (x+1)
+                document.getElementById(id + "-amount").value = b[0]
+                bioGaugeInfo[id].setpoint = b[0]
+                document.getElementById(id + "-kp").value = b[1]
+                document.getElementById(id + "-ki").value = b[2]
+                document.getElementById(id + "-kd").value = b[3]
+                updateBioProGauge(id)
+            }
+
+            let bio = sections[5].split(',')
+            document.getElementById("bio-stirring-gauge1-amount").value = bio[0]
+            document.getElementById("bio-stirring-gauge2-amount").value = bio[6]
+            Plotly.restyle('bio-stirring-gauge1', {title: motorGaugeInfo["bio-stirring-gauge1"].title, value: bio[0]})
+            Plotly.restyle('bio-stirring-gauge2', {title: motorGaugeInfo["bio-stirring-gauge2"].title, value: bio[6]})
+            for(let x = 0; x < 4; x++) {
+                let id = "bio-pump" + (x+1) + "-gauge1" 
+                document.getElementById(id + "-amount").value = bio[x+1]
+                Plotly.restyle(id, {title: motorGaugeInfo[id].title, value: bio[x+1]})
+            }
+            for(let x = 0; x < 4; x++) {
+                let id = "bio-pump" + (x+1) + "-gauge2"
+                document.getElementById(id + "-amount").value = bio[x+5]
+                Plotly.restyle(id, {title: motorGaugeInfo[id].title, value: bio[x+7]})
+            }
+
+            let chem = sections[6].split(',')
+            document.getElementById("chem-pump1-gauge1-amount").value = parseInt(chem[0])
+            document.getElementById("chem-pump2-gauge1-amount").value = parseInt(chem[1])
+            document.getElementById("chem-pump3-gauge1-amount").value = parseInt(chem[2])
+            document.getElementById("chem-pump4-gauge1-amount").value = parseInt(chem[3])
+
+            Plotly.restyle('chem-pump1-gauge1', {title: motorGaugeInfo["chem-pump1-gauge1"].title, value: parseInt(chem[0])})
+            Plotly.restyle('chem-pump2-gauge1', {title: motorGaugeInfo["chem-pump2-gauge1"].title, value: parseInt(chem[1])})
+            Plotly.restyle('chem-pump3-gauge1', {title: motorGaugeInfo["chem-pump3-gauge1"].title, value: parseInt(chem[2])})
+            Plotly.restyle('chem-pump4-gauge1', {title: motorGaugeInfo["chem-pump4-gauge1"].title, value: parseInt(chem[3])})
+
+            let chemThermo = sections[7].split(',')
+            for(let x = 0; x < chemThermo.length; x++) {
+                let c = chemThermo[x].split('|')
+                let id = "chem-thermo-gauge" + (x+1)
+                document.getElementById(id + "-amount").value = c[0]
+                chemGaugeInfo[id].setpoint = c[0]
+                document.getElementById(id + "-kp").value = c[1]
+                document.getElementById(id + "-ki").value = c[2]
+                document.getElementById(id + "-kd").value = c[3]
+                updateChemGauge(id)
+            }
+            
+        })
+    }
+
+    var pUpdateCounter = 2;
+    var bUpdateCounter = 2;
+    var cUpdateCounter = 2;
+
+    if (!!window.EventSource) {
+        var source = new EventSource('/events');
+
+        source.addEventListener('open', function(e) {
+            console.log("Events Connected");
+            document.getElementById("connection").style.backgroundColor = "green"; // Change this to the desired color when connected
+        }, false);
+
+        source.addEventListener('error', function(e) {
+            if (e.target.readyState != EventSource.OPEN) {
+                console.log("Events Disconnected");
+                document.getElementById("connection").style.backgroundColor = "red"; // Change this to the desired color when disconnected
+            }
+        }, false);
+
+        source.addEventListener('pyrolysis-readings', function(e) {
+            var pyrolysisVals = e.data.split(',')
+
+            pyrolysisGaugeInfo["pyrolysis-thermo-gauge1"].value = pyrolysisVals[1];   //DT
+            pyrolysisGaugeInfo["pyrolysis-thermo-gauge2"].value = pyrolysisVals[3];   // V
+            pyrolysisGaugeInfo["pyrolysis-thermo-gauge3"].value = pyrolysisVals[4];   // CC
+            pyrolysisGaugeInfo["pyrolysis-thermo-gauge4"].value = pyrolysisVals[5];   // SR
+            pyrolysisGaugeInfo["pyrolysis-thermo-gauge5"].value = pyrolysisVals[6];   // KD
+            pyrolysisGaugeInfo["pyrolysis-thermo-gauge6"].value = pyrolysisVals[7];   // C0H
+            pyrolysisGaugeInfo["pyrolysis-thermo-gauge7"].value = pyrolysisVals[7];   // C0F
+            pyrolysisGaugeInfo["pyrolysis-thermo-gauge8"].value = pyrolysisVals[8];   // C1H
+            pyrolysisGaugeInfo["pyrolysis-thermo-gauge9"].value = pyrolysisVals[8];   // C1F
+            pyrolysisGaugeInfo["pyrolysis-thermo-gauge10"].value = pyrolysisVals[9];  // C2F
+            
+            let ids = Object.keys(pyrolysisGaugeInfo)
+            ids.forEach((id) => {
+                updatePyrolysisGauge(id)
+            })
+            
+            //plot values
+            if(logging) {
+                pUpdateCounter += 1
+                //could use a for loop but I only want to call extendTraces once
+                if(pUpdateCounter >= 2) {
+                    pUpdateCounter = 0
+                    Plotly.extendTraces('pyrolysis-thermo-graph', {
+                        x: [[pyrolysisVals[0]],[pyrolysisVals[0]],[pyrolysisVals[0]],[pyrolysisVals[0]],[pyrolysisVals[0]],[pyrolysisVals[0]],[pyrolysisVals[0]],[pyrolysisVals[0]],[pyrolysisVals[0]]],
+                        y: [[pyrolysisVals[1]],[pyrolysisVals[2]],[pyrolysisVals[3]],[pyrolysisVals[4]],[pyrolysisVals[5]],[pyrolysisVals[6]],[pyrolysisVals[7]],[pyrolysisVals[8]],[pyrolysisVals[9]]]
+                    }, [0, 1, 2, 3, 4, 5, 6, 7, 8])
+                }
+
+                if(document.getElementById('pyrolysis-tracking').textContent == 'Tracking Data...') {
+                    trackData(document.getElementById('pyrolysis-tracking-amount').value, 'pyrolysis-thermo-graph')
+                }
+                if(document.getElementById('bio-thermo-tracking').textContent == 'Tracking Data...') {
+                    trackData(document.getElementById('bio-thermo-tracking-amount').value, 'bio-thermo-graph')
+                }
+                if(document.getElementById('bio-ph-tracking').textContent == 'Tracking Data...') {
+                    trackData(document.getElementById('bio-ph-tracking-amount').value, 'bio-ph-graph')
+                }
+                if(document.getElementById('bio-oxygen-tracking').textContent == 'Tracking Data...') {
+                    trackData(document.getElementById('bio-oxygen-tracking-amount').value, 'bio-oxygen-graph')
+                }
+                if(document.getElementById('bio-turbidity-tracking').textContent == 'Tracking Data...') {
+                    trackData(document.getElementById('bio-turbidity-tracking-amount').value, 'bio-turbidity-graph')
+                }
+                if(document.getElementById('chem-thermo-tracking').textContent == 'Tracking Data...') {
+                    trackData(document.getElementById('chem-thermo-tracking-amount').value, 'chem-thermo-graph')
+                }
+            }
+        }, false);
+
+        source.addEventListener('bioreactor-readings', function(e) {
+            var bioVals = e.data.split(',')
+
+            bioGaugeInfo["bio-thermo-gauge1"].value = bioVals[1]
+            bioGaugeInfo["bio-ph-gauge1"].value = bioVals[2]
+            bioGaugeInfo["bio-oxygen-gauge1"].value = bioVals[3]
+            bioGaugeInfo["bio-turbidity-gauge1"].value = bioVals[4]
+            bioGaugeInfo["bio-thermo-gauge2"].value = bioVals[5]
+            bioGaugeInfo["bio-ph-gauge2"].value = bioVals[6]
+            bioGaugeInfo["bio-oxygen-gauge2"].value = bioVals[7]
+            bioGaugeInfo["bio-turbidity-gauge2"].value = bioVals[8]
+            bioGaugeInfo["bio-pro-gauge1"].value = bioVals[9]
+            bioGaugeInfo["bio-pro-gauge2"].value = bioVals[10]
+			if(bioVals[11] !== undefined) {
+				let pressureValue = parseFloat(bioVals[11]);
+				if(!isNaN(pressureValue)) {
+					Plotly.update('seq-prac-pressure', {
+						value: parseFloat(bioVals[11]), 
+						title: "System Pressure (PSI)", 
+						'gauge.bar.color': "blue",
+					});
+				}
+			}
+            updateBioPhGauge("bio-ph-gauge1")
+            updateBioPhGauge("bio-ph-gauge2")
+            updateBioProGauge("bio-pro-gauge1")
+            updateBioProGauge("bio-pro-gauge2")
+
+            let ids = Object.keys(bioGaugeInfo)
+            ids.forEach((id) => {
+                Plotly.update(id, {
+                    value: bioVals[ids.indexOf(id)+1], 
+                    title: bioGaugeInfo[id].title, 
+                    'gauge.bar.color': "blue",
+                })
+            })
+
+            //plot values
+            if(logging) {
+                bUpdateCounter += 1
+                if(bUpdateCounter >= 2) {
+                    bUpdateCounter = 0
+                    Plotly.extendTraces('bio-thermo-graph', {
+                        x: [[bioVals[0]],[bioVals[0]]],
+                        y: [[bioVals[1]],[bioVals[5]]]
+                    }, [0, 1])
+                    Plotly.extendTraces('bio-ph-graph', {
+                        x: [[bioVals[0]],[bioVals[0]]],
+                        y: [[bioVals[2]],[bioVals[6]]]
+                    }, [0, 1])
+                    Plotly.extendTraces('bio-oxygen-graph', {
+                        x: [[bioVals[0]],[bioVals[0]]],
+                        y: [[bioVals[3]],[bioVals[7]]]
+                    }, [0, 1])
+                    Plotly.extendTraces('bio-turbidity-graph', {
+                        x: [[bioVals[0]],[bioVals[0]]],
+                        y: [[bioVals[4]],[bioVals[8]]]
+                    }, [0, 1])
+                    Plotly.extendTraces('bio-pro-graph', {
+                        x: [[bioVals[0]],[bioVals[0]]],
+                        y: [[bioVals[9]],[bioVals[10]]]
+                    }, [0, 1])
+                }
+            }
+        }, false)
+
+        source.addEventListener('chemreactor-readings', function(e) {
+            var chemVals = e.data.split(',')
+
+            chemGaugeInfo["chem-thermo-gauge1"].value = chemVals[1]
+            chemGaugeInfo["chem-thermo-gauge2"].value = chemVals[2]
+
+            let ids = Object.keys(chemGaugeInfo)
+            ids.forEach((id) => {
+                chemGaugeInfo[id].value = chemVals[ids.indexOf(id)+1]
+                updateChemGauge(id)
+            })
+            //Plotly.restyle('chem-thermo-gauge1', {value: chemVals[1], title: 'Thermocouple 1', 'gauge.bar.color': "blue"})
+
+            if(logging) {
+                cUpdateCounter += 1
+                if(cUpdateCounter >= 2) {
+                    cUpdateCounter = 0
+                    Plotly.extendTraces('chem-thermo-graph', {
+                        x: [[chemVals[0]],[chemVals[0]]],
+                        y: [[chemVals[1]], [chemVals[2]]]
+                    }, [0, 1])
+                }
+            }
+        }, false)
+    }
+
+    var logging = false;
+    function setRunning() {
+        logging = !logging
+        if(logging) {
+            document.getElementById("run").textContent = "Logging Data..."
+            sendPOST("logging", "logging")
+        } else {
+            document.getElementById("run").textContent = "Start Logging Data"
+            sendPOST("not logging", "not-logging")
+        }
+    }
+
+    function setESTOP() {
+        if(document.getElementById("estop").textContent == 'E-STOP OFF') {
+            document.getElementById("estop").textContent = 'E-STOP ON'
+            sendPOST("estop on", "estop-on")
+        } else {
+            document.getElementById("estop").textContent = 'E-STOP OFF'
+            sendPOST("estop off", "estop-off")
+        }
+    }
+
+    function sendPOST(data, action) {
+        var url = window.location.href + action;
+        fetch(url, {
+            method: "POST",
+            headers: {
+            'Content-Type': 'text/plain',
+            },
+            body: String(data),
+        })
+        .then(response => response.text()) // Get the response as text
+        .then(textData => {
+            // Handle the data from the response
+            //console.log('Response Data:', textData);
+        })
+    }
+
+    function setTracking(buttonID, inputID, graphID) {
+        if(document.getElementById(buttonID).textContent == 'Track Data') {
+            document.getElementById(buttonID).textContent = 'Tracking Data...'
+            trackData(document.getElementById(inputID).value, graphID)
+        } else {
+            document.getElementById(buttonID).textContent = 'Track Data'
+        }
+    }
+    function trackData(amount, graphID) {
+        let lastIndex = pyrolysis_traces[0].x.length-1
+        let currentDate = new Date(pyrolysis_traces[0].x[lastIndex])
+        Plotly.relayout(graphID, {"xaxis.range": [currentDate - amount*1000, currentDate]})
+    }
+
+    function setGaugeValue(amount, gaugeID) {
+        Plotly.update(gaugeID, {value: amount > 100 ? 100 : amount, title: motorGaugeInfo[gaugeID].title})
+
+	// Send command to ESP32
+		sendPumpCommand(gaugeID, amount);
+    }
+
+	function sendPumpCommand(gaugeID, value) {
+		// Map gauge IDs to form parameter names (based on your existing code)
+		const gaugeToParam = {
+			'seq-test-input-pump': 'bm5',      // Using Spent Media Pump in place of Water Pump due to water pump issues
+			'seq-test-stirring2': 'bm6',       // Stirring Motor 2 - same as bio-stirring-gauge2
+			'seq-test-output-pump': 'bm9',     // Harvest Pump - same as bio-pump3-gauge2
+			'bio-stirring-gauge1': 'bm1',
+			'bio-pump1-gauge1': 'bm2',
+			'bio-pump2-gauge1': 'bm3',
+			'bio-pump3-gauge1': 'bm4',
+			'bio-pump4-gauge1': 'bm5',
+			'bio-stirring-gauge2': 'bm6',
+			'bio-pump1-gauge2': 'bm7',
+			'bio-pump2-gauge2': 'bm8',
+			'bio-pump3-gauge2': 'bm9',
+			'bio-pump4-gauge2': 'bm10',
+			'chem-pump1-gauge1': 'cm1',
+			'chem-pump2-gauge1': 'cm2',
+			'chem-pump3-gauge1': 'cm3',
+			'chem-pump4-gauge1': 'cm4'
+		};
+		
+		const paramName = gaugeToParam[gaugeID];
+		if (!paramName) {
+			console.log('Unknown gauge ID:', gaugeID);
+			return;
+		}
+		
+		// Create form data
+		const formData = new URLSearchParams();
+		formData.append(paramName, value);
+		
+		// Send POST request to ESP32
+		fetch(window.location.href + 'form-submit', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+			},
+			body: formData.toString()
+		})
+		.then(response => response.text())
+		.then(data => {
+			console.log('Pump command sent:', paramName, '=', value);
+		})
+		.catch(error => {
+			console.error('Error sending pump command:', error);
+		});
+	}
+
+    function updatePyrolysisGauge(gaugeID) {
+        let setpoint = parseFloat(pyrolysisGaugeInfo[gaugeID].setpoint)
+        let value = parseFloat(pyrolysisGaugeInfo[gaugeID].value)
+        function pickColor() {
+            if      (value < setpoint-50)   {return "yellow"}
+            else if (value > setpoint+50)   {return "red"}
+            else                            {return "green"}
+        }
+        let new_thermo_gauge = {
+            domain: { x: [0, 1], y: [0, 1] },
+            value: value,
+            title: { text: pyrolysisGaugeInfo[gaugeID].title },
+            type: "indicator",
+            mode: "gauge+number",
+            gauge: {
+                axis: { range: [0, setpoint*2] },
+                bar: { color: pickColor() },
+                steps: [
+                    { range: [0, setpoint*2], color: "#dddddd" },
+                    { range: [setpoint*(1-0.275), setpoint*(1-0.225)], color: "yellow" },
+                    { range: [setpoint-(setpoint/40), setpoint+(setpoint/40)], color: "green" },
+                    { range: [setpoint*(1+0.275), setpoint*(1+0.225)], color: "red" }
+                ],
+            }
+        };
+        Plotly.restyle(gaugeID, new_thermo_gauge)
+    }
+
+    function updateChemGauge(gaugeID) {
+        let setpoint = parseFloat(chemGaugeInfo[gaugeID].setpoint)
+        let value = parseFloat(chemGaugeInfo[gaugeID].value)
+        function pickColor() {
+            if      (value < setpoint-50)   {return "yellow"}
+            else if (value > setpoint+50)   {return "red"}
+            else                            {return "green"}
+        }
+        let new_thermo_gauge = {
+            domain: { x: [0, 1], y: [0, 1] },
+            value: value,
+            title: { text: chemGaugeInfo[gaugeID].title },
+            type: "indicator",
+            mode: "gauge+number",
+            gauge: {
+                axis: { range: [0, setpoint*2] },
+                bar: { color: pickColor() },
+                steps: [
+                    { range: [0, setpoint*2], color: "#dddddd" },
+                    { range: [setpoint*(1-0.275), setpoint*(1-0.225)], color: "yellow" },
+                    { range: [setpoint-(setpoint/40), setpoint+(setpoint/40)], color: "green" },
+                    { range: [setpoint*(1+0.275), setpoint*(1+0.225)], color: "red" }
+                ],
+            }
+        };
+        Plotly.restyle(gaugeID, new_thermo_gauge)
+    }
+
+    function updateBioPhGauge(gaugeID) {
+        let setpoint = parseFloat(bioGaugeInfo[gaugeID].setpoint)
+        let value = parseFloat(bioGaugeInfo[gaugeID].value)
+        
+        let new_ph_gauge = {
+            domain: { x: [0, 1], y: [0, 1] },
+            value: value,
+            title: { text: bioGaugeInfo[gaugeID].title },
+            type: "indicator",
+            mode: "gauge+number",
+            gauge: {
+                axis: { range: [null, 14] },
+                bar: { color: "blue" },
+                steps: [
+                    { range: [0, 14], color: "#dddddd" },
+                ],
+                threshold: {
+                    line: { color: "red", width: 4 },
+                    thickness: 0.75,
+                    value: setpoint,
+                }
+            }
+        }
+        Plotly.restyle(gaugeID, new_ph_gauge)
+    }
+
+    function updateBioProGauge(gaugeID) {
+        let setpoint = parseFloat(bioGaugeInfo[gaugeID].setpoint)
+        let value = parseFloat(bioGaugeInfo[gaugeID].value)
+
+        function pickColor() {
+            if      (value < setpoint-50)   {return "yellow"}
+            else if (value > setpoint+50)   {return "red"}
+            else                            {return "green"}
+        }
+        
+        let new_thermo_gauge = {
+            domain: { x: [0, 1], y: [0, 1] },
+            value: value,
+            title: { text: bioGaugeInfo[gaugeID].title },
+            type: "indicator",
+            mode: "gauge+number",
+            gauge: {
+                axis: { range: [0, setpoint*2] },
+                bar: { color: pickColor() },
+                steps: [
+                    { range: [0, setpoint*2], color: "#dddddd" },
+                    { range: [setpoint*(1-0.275), setpoint*(1-0.225)], color: "yellow" },
+                    { range: [setpoint-(setpoint/40), setpoint+(setpoint/40)], color: "green" },
+                    { range: [setpoint*(1+0.275), setpoint*(1+0.225)], color: "red" }
+                ],
+            }
+        }
+        Plotly.restyle(gaugeID, new_thermo_gauge)
+    }
+
+    function downloadCSVFile(url, filename) {
+        // Create a hidden anchor element
+        const anchor = document.createElement('a');
+        anchor.style.display = 'none';
+        document.body.appendChild(anchor);
+
+        // Set the href attribute of the anchor element to the CSV file URL
+        anchor.href = url;
+
+        // Set the download attribute to specify the filename
+        anchor.setAttribute('download', filename);
+
+        // Trigger a click event on the anchor element to start the download
+        anchor.click();
+
+        // Clean up by removing the anchor element
+        document.body.removeChild(anchor);
+    }
+
+    function clearPyrolysis() {
+        sendPOST('delete-pyrolysis', 'delete-pyrolysis')
+
+        for(let x = 0; x < pyrolysis_traces.length; x++) {
+            pyrolysis_traces[x].x = []    //data[0] pushes time to the x axis
+            pyrolysis_traces[x].y = []   //data[x+1] to avoid pushing the date and time
+        }
+        Plotly.newPlot('pyrolysis-thermo-graph', pyrolysis_traces, thermocouple_layout, {scrollZoom: true});
+    }
+
+    function clearBioreactor() {
+        sendPOST('delete-bioreactor', 'delete-bioreactor')
+
+        for(let x = 0; x < 2; x++) {
+            bio_thermo_traces[x].x = []
+            bio_ph_traces[x].x = []  
+            bio_oxygen_traces[x].x = []
+            bio_turbidity_traces[x].x = []
+            bio_pro_traces[x].x = []
+
+            bio_thermo_traces[x].y = []
+            bio_ph_traces[x].y = []
+            bio_oxygen_traces[x].y = []
+            bio_turbidity_traces[x].y = []
+            bio_pro_traces[x].y = []
+        }
+        Plotly.newPlot('bio-thermo-graph', bio_thermo_traces, bio_thermo_layout, {scrollZoom: true});                    
+        Plotly.newPlot('bio-ph-graph', bio_ph_traces, pH_layout, {scrollZoom: true});
+        Plotly.newPlot('bio-oxygen-graph', bio_oxygen_traces, oxygen_layout, {scrollZoom: true});
+        Plotly.newPlot('bio-turbidity-graph', bio_turbidity_traces, turbidity_layout, {scrollZoom: true});
+        Plotly.newPlot('bio-pro-graph', bio_pro_traces, pro_layout, {scrollZoom: true});
+    }
+
+    function clearChemreactor() {
+        sendPOST('delete-chemreactor', 'delete-chemreactor')
+        for(let x = 0; x < 2; x++) {
+            chem_thermo_traces[x].x = []
+            chem_thermo_traces[x].y = []
+        }
+        Plotly.newPlot('chem-thermo-graph', chem_thermo_traces, chem_thermo_layout, {scrollZoom: true});
+    }
+
+    </script>
     
-    case 'p':   // pH setpoint
-      DCMT.pulsePump = true;
-      DCMT.turbPump1 = false;
-      DCMT.turbPump2 = false;
-
-      for(int i=0;i<4;i++) float1.bytes[i] = in_data[i+1];
-      for(int i=0;i<4;i++) float2.bytes[i] = in_data[i+5];
-
-      DCMT.currentPH = (double)(float1.number);
-      DCMT.pHSetpoint = (double)(float2.number);
-      
-      if(!E_STOP){
-        DCMT.m1En = true;
-        DCMT.m2En = true;
-      }
-      DCMT.m1Dir = 1;
-      DCMT.m2Dir = 1;
-      DCMT.m1Speed = MOTOR_MIN_SPEED;
-      DCMT.m2Speed = MOTOR_MIN_SPEED;
-      break;
-
-    case 'P': // populate DCMT params, set motor to min speed, forward, enable PID
-      DCMT.pulsePump = true;
-      DCMT.turbPump1 = false;
-      DCMT.turbPump2 = false;
-
-      for(int i=0;i<4;i++) float1.bytes[i] = in_data[i+1];
-      for(int i=0;i<4;i++) float2.bytes[i] = in_data[i+5];
-      for(int i=0;i<4;i++) float3.bytes[i] = in_data[i+9];
-
-      DCMT.Kp_pH = (double)(float1.number);
-      DCMT.Ki_pH = (double)(float2.number);
-      DCMT.Kd_pH = (double)(float3.number);
-
-      if(!E_STOP){
-        DCMT.m1En = true;
-        DCMT.m2En = true;
-      }
-      DCMT.m1Dir = 1;
-      DCMT.m2Dir = 1;
-      DCMT.m1Speed = MOTOR_MIN_SPEED;
-      DCMT.m2Speed = MOTOR_MIN_SPEED;
-      break;
-
-// T, motor (1,2), direction, enable, sample period (s)
-    case 'T':
-      DCMT.pulsePump = false;    // disable pulse behavior
-
-      for(int i=0;i<4;i++) int1.bytes[i] = (uint8_t)in_data[i+4];
-
-      if(in_data[1] == 1){   // motor 1
-        DCMT.turbSamplePeriod1 = (uint32_t)int1.number * 1000;    // assign sample period
-        DCMT.turbPump1 = true;
-        DCMT.m1Dir = in_data[2];
-        if(!E_STOP)
-          DCMT.m1En = in_data[3];
-      }
-      if(in_data[1] == 2){   // motor 2
-        DCMT.turbSamplePeriod2 = (uint32_t)int1.number * 1000;    // assign sample period
-        DCMT.turbPump2 = true;
-        DCMT.m2Dir = in_data[2];
-        if(!E_STOP)
-          DCMT.m2En = in_data[3];
-      }
-      break;
-  }
-}
+    </body>
+</html>

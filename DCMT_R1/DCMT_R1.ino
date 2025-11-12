@@ -2,7 +2,7 @@
 #include <FastLED.h>
 #include <PID_v1.h>
 
-#define I2C_ADR 23
+#define I2C_ADR 28
 
 #define ESTOP   2
 #define LED_PIN 5
@@ -14,10 +14,12 @@
 #define MC2   11
 #define BR2   12
 
-#define ENC_A1  A3
+#define ENC_A1  A1
 #define ENC_B1  A2
 #define ENC_A2  A1
 #define ENC_B2  A0
+
+#define PRESSURE_PIN  A3    // Pressure transducer analog input
 
 #define SERIAL_UPDATE_TIME_MS       1000
 #define PUMP_PULSE_PERIOD_MS        2000
@@ -66,7 +68,20 @@ struct DCMT_t {
   float currentTurbidity[2];
   uint32_t turbSamplePeriod1 = 10000; // Sampling time is 10s by default
   uint32_t turbSamplePeriod2 = 10000;
+  float pressureVoltage;
+  float currentPressure;    // Pressure in PSI
 } DCMT, DCMT_old;
+
+// Pressure calibration constants
+const float V_min = 0.5;  // Voltage at 0 psi
+const float V_max = V_min + 4;  // Voltage at 100 psi
+const float P_min = 0;      // Minimum pressure in psi
+const float P_max = 100;    // Maximum pressure in psi
+
+// Moving average filter for pressure
+const int PRESSURE_WINDOW_SIZE = 10;
+float pressureBuffer[PRESSURE_WINDOW_SIZE];
+int pressureBufferIndex = 0;
 
 // Acid control activates when pH > Setpoint so control needs to be reversed
 PID basePID(&(DCMT.currentPH), &(DCMT.m1OnTime), &(DCMT.pHSetpoint), DCMT.Kp_pH, DCMT.Ki_pH, DCMT.Kd_pH, DIRECT);
@@ -143,6 +158,7 @@ void setup() {
   pinMode(DIR2, OUTPUT);
   pinMode(ENC_B1, INPUT);   // turbidity sense 1
   pinMode(ENC_B2, INPUT);   // turbidity sense 2
+  pinMode(PRESSURE_PIN, INPUT);
 
   // motor 1
   digitalWrite(DIR1, HIGH);
@@ -170,6 +186,11 @@ void setup() {
   for(int i=0;i<20;i++)
     turbLEDs[i] = CRGB::White;
   FastLED.show();
+
+  // Initialize pressure buffer
+  for(int i = 0; i < PRESSURE_WINDOW_SIZE; i++) {
+    pressureBuffer[i] = 0;
+  }
 
   delay(2000);
 
@@ -210,8 +231,30 @@ void loop() {
     }else{      // run as continuous motor/pump
       actuateMotors();
     }
+    
+    measurePressure();  // Measure pressure
   }
   printOutput();
+}
+
+void measurePressure() {
+  // Read sensor voltage
+  DCMT.pressureVoltage = analogRead(PRESSURE_PIN) * (5.0 / 1023.0);
+  
+  // Convert to pressure
+  float rawPressure = (DCMT.pressureVoltage - V_min) * (P_max - P_min) / (V_max - V_min);
+  rawPressure = constrain(rawPressure, P_min, P_max);
+  
+  // Update moving average filter
+  pressureBuffer[pressureBufferIndex] = rawPressure;
+  pressureBufferIndex = (pressureBufferIndex + 1) % PRESSURE_WINDOW_SIZE;
+  
+  // Compute smoothed pressure
+  float smoothedPressure = 0;
+  for(int i = 0; i < PRESSURE_WINDOW_SIZE; i++) {
+    smoothedPressure += pressureBuffer[i];
+  }
+  DCMT.currentPressure = smoothedPressure / PRESSURE_WINDOW_SIZE;
 }
 
 void measureTurbidity()
@@ -353,6 +396,9 @@ void printOutput()
     Serial.print(analogRead(ENC_B1));
     Serial.print(", ");
     Serial.print(analogRead(ENC_B2));
+    Serial.print(", Pressure: ");
+    Serial.print(DCMT.currentPressure);
+    Serial.print(" PSI");
     /*
     if(DCMT.pulsePump){
       Serial.print("PID: ");
@@ -410,7 +456,7 @@ void actuateMotors()
 }
 
 void requestEvent() {
-  FLOATUNION_t turb1, turb2;
+  FLOATUNION_t turb1, turb2, pressure;
 
   if(isnan(DCMT.turbVoltage[0]) || !(DCMT.turbPump1))
     turb1.number = 0;
@@ -421,9 +467,16 @@ void requestEvent() {
     turb2.number = 0;
   else
     turb2.number = DCMT.turbVoltage[1];
+  
+  // Add pressure data
+  if(isnan(DCMT.currentPressure))
+    pressure.number = 0;
+  else
+    pressure.number = DCMT.currentPressure;
 
   for (int i = 0; i < 4; i++) Wire.write(turb1.bytes[i]);
   for (int i = 0; i < 4; i++) Wire.write(turb2.bytes[i]);
+  for (int i = 0; i < 4; i++) Wire.write(pressure.bytes[i]);  // Send pressure
 }
 
 void receiveEvent(int howMany) 

@@ -14,12 +14,12 @@
 #define MC2   11
 #define BR2   12
 
-#define ENC_A1  A1
+#define ENC_A1  A3
 #define ENC_B1  A2
 #define ENC_A2  A1
 #define ENC_B2  A0
 
-#define PRESSURE_PIN  A3    // Pressure transducer analog input
+#define PRESSURE_PIN  A0    // Pressure transducer analog input
 
 #define SERIAL_UPDATE_TIME_MS       1000
 #define PUMP_PULSE_PERIOD_MS        2000
@@ -73,7 +73,7 @@ struct DCMT_t {
 } DCMT, DCMT_old;
 
 // Pressure calibration constants
-const float V_min = 0.5;  // Voltage at 0 psi
+const float V_min = -0.08;  // Voltage at 0 psi
 const float V_max = V_min + 4;  // Voltage at 100 psi
 const float P_min = 0;      // Minimum pressure in psi
 const float P_max = 100;    // Maximum pressure in psi

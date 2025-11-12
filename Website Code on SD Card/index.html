@@ -2,6 +2,19 @@
 <html>
     <head>
         <link rel="stylesheet" type="text/css" href="css/style.css">
+	<style>
+		.time-input-group {
+			display: flex;
+			align-items: center;
+			gap: 5px;
+		}
+		.time-input-group input {
+			width: 60px;
+		}
+		.time-input-group span {
+			font-weight: bold;
+		}
+	</style>
     </head>
     <body onload="loadData()">
 
@@ -546,7 +559,7 @@
             </div>
         </div>
 
-        <div id="chemreactor">
+        <div id="chemreactor"class="tabcontent">
             <!-- <h1>Chemical Deconstruction Reactor</h1> -->
             <div style="display: grid; grid-template-columns: auto auto auto auto auto auto;">
                 <div>
@@ -635,11 +648,170 @@
                 <button id="chem-thermo-tracking" onclick="setTracking('chem-thermo-tracking', 'chem-thermo-tracking-amount', 'chem-thermo-graph')">Track Data</button>        
             </div>
         </div>
+    </div>
 
-        <div id="sequencing" class="tabcontent">
-            <h2>Bioreactor Sequencing</h2>
-            <!-- Sequencing content will go here -->
-        </div>
+		<div id="sequencing" class="tabcontent">
+			<h2>Bioreactor Sequencing</h2>
+			
+			<!-- Testing Section -->
+			<div style="border: 2px solid #ccc; padding: 20px; margin-bottom: 30px;">
+				<h3>Testing Section</h3>
+				<p style="color: #666; font-style: italic;">Use this section for quick testing cycles with shorter durations</p>
+				
+				<div style="display: grid; grid-template-columns: auto auto; gap: 20px; max-width: 800px;">
+					<div>
+						<label><strong>Number of Cycles:</strong></label>
+						<input type="number" id="test-num-cycles" value="3" min="1" style="width: 100px;">	
+					</div>
+					
+					<div></div>
+					
+					<div>	
+						<label><strong>Feed Pump Runtime:</strong></label>
+						<div class="time-input-group">
+							<input type="number" id="test-feed-hours" value="0" min="0" max="23">
+							<span>h</span>
+							<input type="number" id="test-feed-minutes" value="0" min="0" max="59">
+							<span>m</span>
+							<input type="number" id="test-feed-seconds" value="10" min="0" max="59">
+							<span>s</span>
+						</div>
+						<span style="color: #666; font-size: 0.9em;"> (Step 1: Load reactor)</span>
+					</div>
+					
+					<div>
+						<label><strong>Growth Wait Time:</strong></label>
+						<div class="time-input-group">
+							<input type="number" id="test-growth-hours" value="0" min="0" max="23">
+							<span>h</span>
+							<input type="number" id="test-growth-minutes" value="0" min="0" max="59">
+							<span>m</span>
+							<input type="number" id="test-growth-seconds" value="10" min="0" max="59">
+							<span>s</span>
+						</div>
+						<span style="color: #666; font-size: 0.9em;"> (Step 2: Stirring active)</span>
+					</div>
+					
+					<div>
+						<label><strong>Harvest Pump Runtime:</strong></label>
+						<div class="time-input-group">
+							<input type="number" id="test-harvest-hours" value="0" min="0" max="23">
+							<span>h</span>
+							<input type="number" id="test-harvest-minutes" value="0" min="0" max="59">
+							<span>m</span>
+							<input type="number" id="test-harvest-seconds" value="10" min="0" max="59">
+							<span>s</span>
+						</div>
+						<span style="color: #666; font-size: 0.9em;"> (Step 3: Empty reactor)</span>
+					</div>
+				</div>
+				
+				<div style="margin-top: 20px;">
+					<button id="test-start-btn" style="background-color: #4CAF50; color: white; padding: 10px 20px; font-size: 16px; cursor: pointer;" onclick="startTestingSequence()">
+						Start Testing Sequence
+					</button>
+					<button id="test-stop-btn" style="background-color: #f44336; color: white; padding: 10px 20px; font-size: 16px; cursor: pointer; margin-left: 10px;" onclick="stopTestingSequence()">
+						Stop Sequence
+					</button>
+				</div>
+				
+				<div style="margin-top: 20px; padding: 10px; background-color: #f5f5f5; border-left: 4px solid #666;">
+					<strong>Status:</strong> <span id="test-sequence-status">Idle</span><br>
+					<strong>Current Cycle:</strong> <span id="test-current-cycle">0</span> / <span id="test-total-cycles">0</span><br>
+					<strong>Current Step:</strong> <span id="test-current-step">None</span><br>
+					<strong>Time Remaining:</strong> <span id="test-time-remaining">00:00:00</span>
+				</div>
+
+				<!-- Testing Section Pump Gauges -->
+				<h4 style="margin-top: 30px;">Equipment Controls</h4>
+				<div style="display: grid; grid-template-columns: auto auto auto; gap: 20px;">
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-test-input-pump"></div>
+						<p style="margin: 5px 0;"><strong>Input Pump (Water)</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-test-stirring2"></div>
+						<p style="margin: 5px 0;"><strong>Stirring Motor 2</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-test-output-pump"></div>
+						<p style="margin: 5px 0;"><strong>Output Pump (Harvest)</strong></p>
+					</div>
+				</div>
+			</div>
+			
+			<!-- Practical Section -->
+			<div style="border: 2px solid #ccc; padding: 20px;">
+				<h3>Practical Section</h3>
+				<p style="color: #666; font-style: italic;">Use this section for longer production cycles (hours/days)</p>
+				
+				<div style="margin-top: 20px;">
+					<button id="prac-start-btn" style="background-color: #4CAF50; color: white; padding: 10px 20px; font-size: 16px; cursor: pointer;" onclick="startPracticalSequence()">
+						Start Practical Sequence
+					</button>
+					<button id="prac-stop-btn" style="background-color: #f44336; color: white; padding: 10px 20px; font-size: 16px; cursor: pointer; margin-left: 10px;" onclick="stopPracticalSequence()">
+						Stop Sequence
+					</button>
+				</div>
+
+				<div style="margin-top: 20px; padding: 10px; background-color: #f5f5f5; border-left: 4px solid #666;">
+					<strong>Status:</strong> <span id="prac-sequence-status">Idle</span><br>
+					<strong>Current Cycle:</strong> <span id="prac-current-cycle">0</span> / <span id="prac-total-cycles">0</span><br>
+					<strong>Current Step:</strong> <span id="prac-current-step">None</span><br>
+					<strong>Time Remaining:</strong> <span id="prac-time-remaining">00:00:00</span>
+				</div>
+				
+				<!-- Practical Section Gauges -->
+				<div style="display: grid; grid-template-columns: auto auto auto; gap: 20px; margin-top: 20px;">
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-thermo1"></div>
+						<p style="margin: 5px 0;"><strong>Thermocouple 1</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-ph2"></div>
+						<p style="margin: 5px 0;"><strong>pH Sensor 2</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-oxygen1"></div>
+						<p style="margin: 5px 0;"><strong>Dissolved Oxygen 1</strong></p>
+					</div>
+					
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-turbidity1"></div>
+						<p style="margin: 5px 0;"><strong>Turbidity 1</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-pressure"></div>
+						<p style="margin: 5px 0;"><strong>System Pressure</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-stirring2"></div>
+						<p style="margin: 5px 0;"><strong>Stirring Motor 2</strong></p>
+					</div>
+					<div></div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-base-pump1"></div>
+						<p style="margin: 5px 0;"><strong>Base Pump 1</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-acid-pump1"></div>
+						<p style="margin: 5px 0;"><strong>Acid Pump 1</strong></p>
+					</div>
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-water-pump"></div>
+						<p style="margin: 5px 0;"><strong>Water Pump (Input)</strong></p>
+					</div>
+					
+					<div style="display: flex; flex-direction: column; align-items: center;">
+						<div id="seq-prac-harvest-pump"></div>
+						<p style="margin: 5px 0;"><strong>Harvest Pump (Output)</strong></p>
+					</div>
+				</div>
+			</div>
+		</div>
+
+
+
 
     <script src="js/plotly.js"></script>
     <script src="js/tabbing.js"></script>
@@ -1169,6 +1341,29 @@
         }
     }];
 
+	//----------------Pressure Gauge-----------------------//
+	var pressure_gauge = [{
+		domain: { x: [0, 1], y: [0, 1] },
+		value: 0,
+		title: { text: "" },
+		type: "indicator",
+		mode: "gauge+number",
+		delta: { reference: 50 },
+		number: {'valueformat':'.1f'},
+		gauge: {
+			axis: { range: [null, 100] },
+			bar: { color: "blue" },
+			steps: [
+				{ range: [0, 100], color: "#dddddd" },
+			],
+			threshold: {
+                line: { color: "red", width: 4 },
+                thickness: 0.75,
+                value: 14
+            }
+		}
+	}];
+
     //----------------Dissolved Oxygen Gauge-----------------------//
     var oxygen_gauge = [{
         domain: { x: [0, 1], y: [0, 1] },
@@ -1390,7 +1585,19 @@
         },
         "chem-pump4-gauge1": {
             title: "Reactor Wash"
-        }
+        },
+	"seq-test-input-pump": {
+		title: "Water Pump"
+	},
+	"seq-test-stirring2": {
+		title: "Stirring Motor 2"
+	},
+	"seq-test-output-pump": {
+		title: "Harvest Pump"
+	},
+	"seq-prac-stirring2": {
+		title: "Stirring Motor 2"
+	}
     }
     //create new gauge plots
     Plotly.newPlot('bio-thermo-gauge1', thermo_bio_gauge, gaugeLayout);
@@ -1474,6 +1681,269 @@
     Plotly.restyle('chem-pump2-gauge1', {title: motorGaugeInfo["chem-pump2-gauge1"].title})
     Plotly.restyle('chem-pump3-gauge1', {title: motorGaugeInfo["chem-pump3-gauge1"].title})
     Plotly.restyle('chem-pump4-gauge1', {title: motorGaugeInfo["chem-pump4-gauge1"].title})
+
+
+		//----------------Sequencing Gauges-----------------------//
+	// Testing section pump gauges
+	Plotly.newPlot("seq-test-input-pump", motor_gauge, gaugeLayout);
+	Plotly.newPlot("seq-test-stirring2", motor_gauge, gaugeLayout);
+	Plotly.newPlot("seq-test-output-pump", motor_gauge, gaugeLayout);
+	   
+	Plotly.restyle("seq-test-input-pump", {title: "Water Pump"});
+	Plotly.restyle("seq-test-stirring2", {title: "Stirring Motor 2"});
+	Plotly.restyle("seq-test-output-pump", {title: "Harvest Pump"});
+		
+	// Practical section gauges
+	Plotly.newPlot('seq-prac-thermo1', thermo_bio_gauge, gaugeLayout);
+	Plotly.newPlot('seq-prac-ph2', pH_gauge, gaugeLayout);
+	Plotly.newPlot('seq-prac-oxygen1', oxygen_gauge, gaugeLayout);
+	Plotly.newPlot('seq-prac-turbidity1', turbidity_gauge, gaugeLayout);
+	Plotly.newPlot("seq-prac-stirring2", motor_gauge, gaugeLayout);
+	Plotly.newPlot("seq-prac-base-pump1", motor_gauge, gaugeLayout);
+	Plotly.newPlot("seq-prac-acid-pump1", motor_gauge, gaugeLayout);
+	Plotly.newPlot("seq-prac-water-pump", motor_gauge, gaugeLayout);
+	Plotly.newPlot("seq-prac-harvest-pump", motor_gauge, gaugeLayout);
+	Plotly.newPlot('seq-prac-pressure', pressure_gauge, gaugeLayout);
+
+	// Set titles
+	Plotly.restyle('seq-prac-thermo1', {title: "Thermocouple 1"});
+	Plotly.restyle('seq-prac-ph2', {title: "pH Sensor 2"});
+	Plotly.restyle('seq-prac-oxygen1', {title: "Dissolved Oxygen 1"});
+	Plotly.restyle('seq-prac-turbidity1', {title: "Turbidity 1"});
+	Plotly.restyle("seq-prac-stirring2", {title: "Stirring Motor 2"});
+	Plotly.restyle("seq-prac-base-pump1", {title: "Base Pump 1"});
+	Plotly.restyle("seq-prac-acid-pump1", {title: "Acid Pump 1"});
+	Plotly.restyle("seq-prac-water-pump", {title: "Water Pump"});
+	Plotly.restyle("seq-prac-harvest-pump", {title: "Harvest Pump"});
+	Plotly.restyle('seq-prac-pressure', {title: "System Pressure (PSI)"});
+
+	//----------------Sequencing Control Variables-----------------------//
+	var testSequenceActive = false;
+	var pracSequenceActive = false;
+	var testSequenceTimer = null;
+	var pracSequenceTimer = null;
+	var testSequenceState = {
+		currentCycle: 0,
+		totalCycles: 0,
+		currentStep: 'idle',
+		timeRemaining: 0
+	};
+	var pracSequenceState = {
+		currentCycle: 0,
+		totalCycles: 0,
+		currentStep: 'idle',
+		timeRemaining: 0
+	};
+
+	//----------------Sequencing Functions-----------------------//
+	function formatTime(seconds) {
+		const hours = Math.floor(seconds / 3600);
+		const minutes = Math.floor((seconds % 3600) / 60);
+		const secs = seconds % 60;
+		return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+	}
+
+	function getTimeInSeconds(hoursId, minutesId, secondsId) {
+		const hours = parseInt(document.getElementById(hoursId).value) || 0;
+		const minutes = parseInt(document.getElementById(minutesId).value) || 0;
+		const seconds = parseInt(document.getElementById(secondsId).value) || 0;
+		return (hours * 3600) + (minutes * 60) + seconds;
+	}
+
+	function updateTestingDisplay() {
+		document.getElementById('test-current-cycle').textContent = testSequenceState.currentCycle;
+		document.getElementById('test-total-cycles').textContent = testSequenceState.totalCycles;
+		document.getElementById('test-current-step').textContent = testSequenceState.currentStep;
+		document.getElementById('test-time-remaining').textContent = formatTime(testSequenceState.timeRemaining);
+	}
+
+	function updatePracticalDisplay() {
+		document.getElementById('prac-current-cycle').textContent = pracSequenceState.currentCycle;
+		document.getElementById('prac-total-cycles').textContent = pracSequenceState.totalCycles;
+		document.getElementById('prac-current-step').textContent = pracSequenceState.currentStep;
+		document.getElementById('prac-time-remaining').textContent = formatTime(pracSequenceState.timeRemaining);
+	}
+
+	function startTestingSequence() {
+		if (testSequenceActive || pracSequenceActive) return;
+		
+		testSequenceActive = true;
+		testSequenceState.currentCycle = 1;
+		testSequenceState.totalCycles = parseInt(document.getElementById('test-num-cycles').value);
+		
+		// Disable practical mode button
+		document.getElementById('prac-start-btn').disabled = true;
+		document.getElementById('prac-start-btn').style.opacity = '0.5';
+		document.getElementById('prac-start-btn').style.cursor = 'not-allowed';
+		
+		document.getElementById('test-sequence-status').textContent = 'Running';
+		runTestingCycle();
+	}
+
+	function runTestingCycle() {
+		if (!testSequenceActive) return;
+		
+		// Step 1: Load reactor (Feed pump)
+		testSequenceState.currentStep = 'Loading Reactor';
+		testSequenceState.timeRemaining = getTimeInSeconds('test-feed-hours', 'test-feed-minutes', 'test-feed-seconds');
+		
+		// Check if time is valid
+		if (testSequenceState.timeRemaining <= 0) {
+			console.log('Invalid feed time, skipping to growth phase');
+			runGrowthPhase();
+			return;
+		}
+		
+		updateTestingDisplay();
+		
+		// Activate input pump
+		console.log('Activating water pump for', testSequenceState.timeRemaining, 'seconds');
+		setGaugeValue(80, 'seq-test-input-pump');
+		
+		testSequenceTimer = setInterval(() => {
+			testSequenceState.timeRemaining--;
+			updateTestingDisplay();
+			
+			if (testSequenceState.timeRemaining <= 0) {
+				clearInterval(testSequenceTimer);
+				console.log('Feed phase complete, turning off pump');
+				setGaugeValue(0, 'seq-test-input-pump');
+				setTimeout(() => runGrowthPhase(), 500); // Small delay before next phase
+			}
+		}, 1000);
+	}
+
+	function runGrowthPhase() {
+		if (!testSequenceActive) return;
+		
+		// Step 2: Growth phase (Stirring active)
+		testSequenceState.currentStep = 'Growth Phase';
+		testSequenceState.timeRemaining = getTimeInSeconds('test-growth-hours', 'test-growth-minutes', 'test-growth-seconds');
+		
+		// Check if time is valid
+		if (testSequenceState.timeRemaining <= 0) {
+			console.log('Invalid growth time, skipping to harvest phase');
+			runHarvestPhase();
+			return;
+		}
+		
+		updateTestingDisplay();
+		
+		// Activate stirring motor 2
+		console.log('Activating stirring motor for', testSequenceState.timeRemaining, 'seconds');
+		setGaugeValue(50, 'seq-test-stirring2');
+		
+		testSequenceTimer = setInterval(() => {
+			testSequenceState.timeRemaining--;
+			updateTestingDisplay();
+			
+			if (testSequenceState.timeRemaining <= 0) {
+				clearInterval(testSequenceTimer);
+				console.log('Growth phase complete, turning off stirring');
+				setGaugeValue(0, 'seq-test-stirring2');
+				setTimeout(() => runHarvestPhase(), 500); // Small delay before next phase
+			}
+		}, 1000);
+	}
+
+	function runHarvestPhase() {
+		if (!testSequenceActive) return;
+		
+		// Step 3: Harvest (Output pump)
+		testSequenceState.currentStep = 'Harvesting';
+		testSequenceState.timeRemaining = getTimeInSeconds('test-harvest-hours', 'test-harvest-minutes', 'test-harvest-seconds');
+		
+		// Check if time is valid
+		if (testSequenceState.timeRemaining <= 0) {
+			console.log('Invalid harvest time, completing cycle');
+			completeCycle();
+			return;
+		}
+		
+		updateTestingDisplay();
+		
+		// Activate output pump
+		console.log('Activating harvest pump for', testSequenceState.timeRemaining, 'seconds');
+		setGaugeValue(80, 'seq-test-output-pump');
+		
+		testSequenceTimer = setInterval(() => {
+			testSequenceState.timeRemaining--;
+			updateTestingDisplay();
+			
+			if (testSequenceState.timeRemaining <= 0) {
+				clearInterval(testSequenceTimer);
+				console.log('Harvest phase complete, turning off pump');
+				setGaugeValue(0, 'seq-test-output-pump');
+				setTimeout(() => completeCycle(), 500); // Small delay before next cycle
+			}
+		}, 1000);
+	}
+
+	function completeCycle() {
+		// Check if we need to loop
+		if (testSequenceState.currentCycle < testSequenceState.totalCycles) {
+			console.log('Cycle', testSequenceState.currentCycle, 'complete. Starting cycle', testSequenceState.currentCycle + 1);
+			testSequenceState.currentCycle++;
+			setTimeout(() => runTestingCycle(), 1000); // Small delay between cycles
+		} else {
+			console.log('All cycles complete!');
+			stopTestingSequence();
+		}
+	}
+
+	function stopTestingSequence() {
+		testSequenceActive = false;
+		clearInterval(testSequenceTimer);
+		
+		// Turn off all pumps and motors
+		setGaugeValue(0, 'seq-test-input-pump');
+		setGaugeValue(0, 'seq-test-output-pump');
+		setGaugeValue(0, 'seq-test-stirring2');
+		
+		// Reset display
+		testSequenceState.currentStep = 'Idle';
+		testSequenceState.timeRemaining = 0;
+		document.getElementById('test-sequence-status').textContent = 'Idle';
+		updateTestingDisplay();
+		
+		// Re-enable practical mode button
+		document.getElementById('prac-start-btn').disabled = false;
+		document.getElementById('prac-start-btn').style.opacity = '1';
+		document.getElementById('prac-start-btn').style.cursor = 'pointer';
+	}
+
+	function startPracticalSequence() {
+		if (testSequenceActive || pracSequenceActive) return;
+		
+		pracSequenceActive = true;
+		
+		// Disable testing mode button
+		document.getElementById('test-start-btn').disabled = true;
+		document.getElementById('test-start-btn').style.opacity = '0.5';
+		document.getElementById('test-start-btn').style.cursor = 'not-allowed';
+		
+		document.getElementById('prac-sequence-status').textContent = 'Running';
+		
+		// TODO: Implement practical sequence logic
+		alert('Practical sequence not yet implemented');
+	}
+
+	function stopPracticalSequence() {
+		pracSequenceActive = false;
+		clearInterval(pracSequenceTimer);
+		
+		// Reset display
+		pracSequenceState.currentStep = 'Idle';
+		pracSequenceState.timeRemaining = 0;
+		document.getElementById('prac-sequence-status').textContent = 'Idle';
+		updatePracticalDisplay();
+		
+		// Re-enable testing mode button
+		document.getElementById('test-start-btn').disabled = false;
+		document.getElementById('test-start-btn').style.opacity = '1';
+		document.getElementById('test-start-btn').style.cursor = 'pointer';
+	}
+
 
     //--------------------------------------------------------------------------//
 
@@ -1738,7 +2208,16 @@
             bioGaugeInfo["bio-turbidity-gauge2"].value = bioVals[8]
             bioGaugeInfo["bio-pro-gauge1"].value = bioVals[9]
             bioGaugeInfo["bio-pro-gauge2"].value = bioVals[10]
-
+			if(bioVals[11] !== undefined) {
+				let pressureValue = parseFloat(bioVals[11]);
+				if(!isNaN(pressureValue)) {
+					Plotly.update('seq-prac-pressure', {
+						value: parseFloat(bioVals[11]), 
+						title: "System Pressure (PSI)", 
+						'gauge.bar.color': "blue",
+					});
+				}
+			}
             updateBioPhGauge("bio-ph-gauge1")
             updateBioPhGauge("bio-ph-gauge2")
             updateBioProGauge("bio-pro-gauge1")
@@ -1862,7 +2341,59 @@
 
     function setGaugeValue(amount, gaugeID) {
         Plotly.update(gaugeID, {value: amount > 100 ? 100 : amount, title: motorGaugeInfo[gaugeID].title})
+
+	// Send command to ESP32
+		sendPumpCommand(gaugeID, amount);
     }
+
+	function sendPumpCommand(gaugeID, value) {
+		// Map gauge IDs to form parameter names (based on your existing code)
+		const gaugeToParam = {
+			'seq-test-input-pump': 'bm5',      // Using Spent Media Pump in place of Water Pump due to water pump issues
+			'seq-test-stirring2': 'bm6',       // Stirring Motor 2 - same as bio-stirring-gauge2
+			'seq-test-output-pump': 'bm9',     // Harvest Pump - same as bio-pump3-gauge2
+			'bio-stirring-gauge1': 'bm1',
+			'bio-pump1-gauge1': 'bm2',
+			'bio-pump2-gauge1': 'bm3',
+			'bio-pump3-gauge1': 'bm4',
+			'bio-pump4-gauge1': 'bm5',
+			'bio-stirring-gauge2': 'bm6',
+			'bio-pump1-gauge2': 'bm7',
+			'bio-pump2-gauge2': 'bm8',
+			'bio-pump3-gauge2': 'bm9',
+			'bio-pump4-gauge2': 'bm10',
+			'chem-pump1-gauge1': 'cm1',
+			'chem-pump2-gauge1': 'cm2',
+			'chem-pump3-gauge1': 'cm3',
+			'chem-pump4-gauge1': 'cm4'
+		};
+		
+		const paramName = gaugeToParam[gaugeID];
+		if (!paramName) {
+			console.log('Unknown gauge ID:', gaugeID);
+			return;
+		}
+		
+		// Create form data
+		const formData = new URLSearchParams();
+		formData.append(paramName, value);
+		
+		// Send POST request to ESP32
+		fetch(window.location.href + 'form-submit', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+			},
+			body: formData.toString()
+		})
+		.then(response => response.text())
+		.then(data => {
+			console.log('Pump command sent:', paramName, '=', value);
+		})
+		.catch(error => {
+			console.error('Error sending pump command:', error);
+		});
+	}
 
     function updatePyrolysisGauge(gaugeID) {
         let setpoint = parseFloat(pyrolysisGaugeInfo[gaugeID].setpoint)

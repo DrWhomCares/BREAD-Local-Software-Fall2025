@@ -38,6 +38,15 @@ ESP32Time rtc;
 #define SPI_SCK       18
 
 #define ESTOP   32
+const int ESTOP_PHYS_IN = 34;
+bool phys_estop_active = false;
+unsigned long lastEstopRead = 0;
+
+void debugPrintLevel(const char* tag, int v) {
+  Serial.print(tag); Serial.println(v ? "HIGH" : "LOW");
+}
+
+
 
 const char* ssid     = "BREAD-DARPA";
 const char* password = "12345678";
@@ -298,6 +307,11 @@ void setup() {
   initSlices();
 
   pinMode(ESTOP, OUTPUT);
+  digitalWrite(ESTOP, LOW);           // << make sure the bus starts released
+  pinMode(ESTOP_PHYS_IN, INPUT);      // external pulldown on GPIO34
+  Serial.println("Boot: configured ESTOP_PHYS_IN=34 (expect LOW with pulldown)");
+  Serial.printf("Boot read: GPIO34=%d\n", digitalRead(ESTOP_PHYS_IN));
+
 
   //start access point wifi
   WiFi.softAP(ssid, password);
@@ -549,10 +563,12 @@ Chem Decon Commands:
       logging = false;
     } if(request->url() == "/estop-on") {
       Serial.println("estop on");
-      digitalWrite(ESTOP, HIGH);
-    } if(request->url() == "/estop-off") {
+      digitalWrite(ESTOP, HIGH);      // << assert bus from the website action
+      events.send("1", "estop");      // << keep UI in sync
+      } if(request->url() == "/estop-off") {
       Serial.println("estop off");
       digitalWrite(ESTOP, LOW);
+      events.send("0", "estop");   // keep UI in sync (optional but recommended)
     } else if(request->url() == "/delete-pyrolysis") {
       writeFile(SD, "/pyrolysis-data.csv", "Date and Time,Dissolution Tank,Dissolution Heating Tape,Valve,Char Chamber,Secondary Reactor,Knockout Drum,Condenser 0,Condenser 1,Condenser 2");
     } else if(request->url() == "/delete-bioreactor") {
@@ -584,7 +600,21 @@ int calDelay = 900;
 bool readRequestedPHDO = false;
 
 uint8_t loggingCounter = 6;
-void loop() {
+  void loop() {
+    unsigned long now = millis();
+  if (now - lastEstopRead > 20) {                  // 20 ms debounce
+    lastEstopRead = now;
+
+    bool pressed = (digitalRead(ESTOP_PHYS_IN) == HIGH); // HIGH = 3.3V on 34
+    static bool lastPressed = false;
+    if (pressed != lastPressed) {
+      lastPressed = pressed;
+
+      digitalWrite(ESTOP, pressed ? HIGH : LOW);   // SAME action as website
+      events.send(pressed ? "1" : "0", "estop");   // update the UI
+      Serial.println(pressed ? "Physical E-STOP pressed" : "Physical E-STOP released");
+    }
+  }  
   //get slice data from slices
   if(millis() - lastPOST > SLICE_DATA_INTERVAL_MS) {
     Serial.println("getting data");

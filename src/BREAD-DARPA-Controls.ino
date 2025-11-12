@@ -650,7 +650,7 @@ uint8_t loggingCounter = 6;
       if(bio_thermo[n][1] == 2)
         RLHTRequestThermo(bio_thermo[n][0], &(temp), &(bio_thermo_val[n]));
     }
-    DCMTRequestPressure(bio_pressure, &bio_pressure_val);
+    bio_pressure_val = DCMTRequestPressure(bio_pressure);
     for(int i=0;i<2;i++){
       float temp;
       //if thermocouple 1?
@@ -1002,16 +1002,17 @@ void DCMTRequestTurbidity(int address, float* turbidity1, float* turbidity2)
   *turbidity2 = turb2.number;
 }
 
-void DCMTRequestPressure(int address, float* pressure)
+float DCMTRequestPressure(int address)
 {
   bool data_received = false;
   byte in_char;
   char in_data[20];
   FLOATUNION_t press;
+  float pressure = 0;
 
   press.number = 0;
   
-  Wire.requestFrom(address, 12, 1);
+  Wire.requestFrom(address, 4, 1);
 
   int i=0;
   while (Wire.available()) {
@@ -1022,12 +1023,13 @@ void DCMTRequestPressure(int address, float* pressure)
   }
 
   if(data_received){
-    for(int x=8;x<12;x++){
+    for(int x=0;x<4;x++){
       press.bytes[x] = in_data[x];
     }
   }
-
-  *pressure = press.number;
+  pressure = press.number;  //REAL CODE
+  //pressure = 12;          //Test code
+  return pressure;     
 }
 
 void DCMTCommandTurbidity(int address, byte motor, byte direction, bool enable, int sample_period)

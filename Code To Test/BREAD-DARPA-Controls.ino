@@ -15,13 +15,11 @@ Get pH or DO readings:        float PHDORequest(int address)
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 
-
 #include "SD.h"
 #include "FS.h"
 #include "SPI.h"
 #include <Wire.h>
 
-#include <esp32-hal-timer.h>
 #include <ESP32Time.h>
 ESP32Time rtc;
 
@@ -38,15 +36,6 @@ ESP32Time rtc;
 #define SPI_SCK       18
 
 #define ESTOP   32
-const int ESTOP_PHYS_IN = 34;
-bool phys_estop_active = false;
-unsigned long lastEstopRead = 0;
-
-void debugPrintLevel(const char* tag, int v) {
-  Serial.print(tag); Serial.println(v ? "HIGH" : "LOW");
-}
-
-
 
 const char* ssid     = "BREAD-DARPA";
 const char* password = "12345678";
@@ -146,11 +135,9 @@ float bio_thermo_val[4] = {0,0,0,0};
 uint8_t autoCheck = 0;
 uint8_t checkOsc = 0;
 uint8_t peak = 0;
-hw_timer_t *timer = timerBegin(0, 80, true);
+hw_timer_t *timer = NULL;
 float bio_post_heater_auto[5] = {0,0,0,0,0}; // {maxTemp, prevTemp, prevTime, Peak1, prevDeriv}
 
-// This is for data to be sent to the website for display to the operator
-float bio_heater_auto_pid_vals[3] = {0,0,0}; // {kP, kI, kD} 
 
 int bio_ph[2][2] = {      // bioreactor pH layout {PHDO address, DCMT address}
   {98, 20},
@@ -307,11 +294,6 @@ void setup() {
   initSlices();
 
   pinMode(ESTOP, OUTPUT);
-  digitalWrite(ESTOP, LOW);           // << make sure the bus starts released
-  pinMode(ESTOP_PHYS_IN, INPUT);      // external pulldown on GPIO34
-  Serial.println("Boot: configured ESTOP_PHYS_IN=34 (expect LOW with pulldown)");
-  Serial.printf("Boot read: GPIO34=%d\n", digitalRead(ESTOP_PHYS_IN));
-
 
   //start access point wifi
   WiFi.softAP(ssid, password);
@@ -439,8 +421,7 @@ Chem Decon Commands:
             //Send initial Kp value
             bio_post_heater_pid[index][1] = postValue.toFloat();
             timer = timerBegin(0, 80, true);
-            Serial.println("bilbo");
-            RLHTCommandAuto(bio_post_heaters[index][0],bio_post_heaters[index][1], bio_post_heater_pid[index][0],bio_post_heater_pid[index][1],bio_post_heaters[index][2], bio_post_heaters[index][3]);
+            RLHTCommandPID(bio_post_heaters[index][0], bio_post_heaters[index][1], bio_post_heater_pid[index][1], 0, 0);
             break;
           case 's': //setpoint
             bio_post_heater_pid[index][0] = postValue.toFloat();
@@ -497,6 +478,7 @@ Chem Decon Commands:
       } else {
         toServer += "not logging-";
       }
+           
       for(uint8_t x = 0; x < 10; x++) {
         toServer += (
           String(pyro_heater_pid[x][0]) + "|" +   // setpoint
@@ -563,12 +545,10 @@ Chem Decon Commands:
       logging = false;
     } if(request->url() == "/estop-on") {
       Serial.println("estop on");
-      digitalWrite(ESTOP, HIGH);      // << assert bus from the website action
-      events.send("1", "estop");      // << keep UI in sync
-      } if(request->url() == "/estop-off") {
+      digitalWrite(ESTOP, HIGH);
+    } if(request->url() == "/estop-off") {
       Serial.println("estop off");
       digitalWrite(ESTOP, LOW);
-      events.send("0", "estop");   // keep UI in sync (optional but recommended)
     } else if(request->url() == "/delete-pyrolysis") {
       writeFile(SD, "/pyrolysis-data.csv", "Date and Time,Dissolution Tank,Dissolution Heating Tape,Valve,Char Chamber,Secondary Reactor,Knockout Drum,Condenser 0,Condenser 1,Condenser 2");
     } else if(request->url() == "/delete-bioreactor") {
@@ -600,21 +580,7 @@ int calDelay = 900;
 bool readRequestedPHDO = false;
 
 uint8_t loggingCounter = 6;
-  void loop() {
-    unsigned long now = millis();
-  if (now - lastEstopRead > 20) {                  // 20 ms debounce
-    lastEstopRead = now;
-
-    bool pressed = (digitalRead(ESTOP_PHYS_IN) == HIGH); // HIGH = 3.3V on 34
-    static bool lastPressed = false;
-    if (pressed != lastPressed) {
-      lastPressed = pressed;
-
-      digitalWrite(ESTOP, pressed ? HIGH : LOW);   // SAME action as website
-      events.send(pressed ? "1" : "0", "estop");   // update the UI
-      Serial.println(pressed ? "Physical E-STOP pressed" : "Physical E-STOP released");
-    }
-  }  
+void loop() {
   //get slice data from slices
   if(millis() - lastPOST > SLICE_DATA_INTERVAL_MS) {
     Serial.println("getting data");
@@ -661,16 +627,11 @@ uint8_t loggingCounter = 6;
       if(bio_post_heaters[i][2] == 2) {
         RLHTRequestThermo(bio_post_heaters[i][0], &(temp), &(bio_thermo_val[i+2]));
         //(int address, byte heater, float Ku,float setpoint, float temp, float time)
-        //running for dryer only 
-        if (i == 1)
-        {
-            Serial.println("loop dude");
-            RLHTCommandAuto(bio_post_heaters[1][0],bio_post_heaters[1][1], bio_post_heater_pid[1][0],bio_post_heater_pid[1][1],bio_post_heaters[1][2], bio_post_heaters[1][3]);
-            //RLHTCommandPIDAuto(bio_post_heaters[1][0], bio_post_heaters[1][1],bio_post_heater_pid[1][1],bio_post_heater_pid[1][0],bio_thermo_val[3],timerReadSeconds(timer));
-           //if not oscillating...
-        // if (checkOsc == 0) {
-        //   timerRestart(timer);
-        // }
+        
+        RLHTCommandPIDAuto(bio_post_heaters[i][0], bio_post_heaters[i][1],bio_post_heater_pid[i][1],bio_post_heater_pid[i][0],bio_thermo_val[4],timerReadSeconds(timer));
+        //if not oscillating...
+        if (checkOsc == 0) {
+          timerRestart(timer);
         }
         //RLHTCommandSetpoint(bio_post_heaters[index][0], bio_post_heaters[index][1], bio_post_heater_pid[index][0], bio_post_heaters[index][2], bio_post_heaters[index][3]);
       }
@@ -697,11 +658,6 @@ uint8_t loggingCounter = 6;
     for(uint8_t n = 0; n < 2; n++) {
       bioToServer += "," + String(bio_thermo_val[n]) + "," + String(bio_ph_val[n][0]) + "," + String(bio_do_val[n]) + "," + String(bio_turbidity_val[n]);
     }
-    bioToServer += "," + String(bio_thermo_val[2]) + "," + String(bio_thermo_val[3]);
-    // Push the data from the PID auto to the website
-    for (uint8_t i = 0; i < 3; i++) {
-      bioToServer += "," + String(bio_heater_auto_pid_vals[i]);
-    }
     bioToServer += "," + String(bio_thermo_val[2]) + "," + String(bio_thermo_val[3]) + "," + String(bio_pressure_val);
     for(uint8_t n = 0; n < 2; n++) {
       chemToServer += "," + String(chem_thermo_val[n]);
@@ -714,8 +670,8 @@ Pyrolysis Reactor:
   Format:  Date and Time,Dissolution Tank,Dissolution Heating Tape,Valve,Char Chamber,Secondary Reactor,Knockout Drum,Condenser 0,Condenser 1,Condenser 2
   Index:        0       ,       1        ,            2           ,   3 ,     4      ,        5        ,      6      ,     7     ,     8     ,     9    
 Bioreactor:
-  Format:  Date and Time,Thermo1,pH1,DO1,Turb1,Thermo2,pH2,DO2,Turb2,Past,Dry, Pressure
-  Index:       0        ,   1   , 2 , 3 ,  4  ,   5   , 6 , 7 ,  8  ,  9 , 10,   11
+  Format:  Date and Time,Thermo1,pH1,DO1,Turb1,Thermo2,pH2,DO2,Turb2,Past,Dry
+  Index:       0        ,   1   , 2 , 3 ,  4  ,   5   , 6 , 7 ,  8  ,  9 , 10
 Chemreactor:
   Format:  Date and Time,Reactor 1,Reactor 2
   Index:         0      ,    1    ,    2
@@ -724,7 +680,7 @@ Chemreactor:
     events.send(bioToServer.c_str(), "bioreactor-readings", millis());
     events.send(chemToServer.c_str(), "chemreactor-readings", millis());
     
-    //log data the SD card
+    //log onto the SD card
     if(logging){
       appendFile(SD, "/pyrolysis-data.csv", "\r\n" + pyrolysisToServer);
       appendFile(SD, "/bioreactor-data.csv", "\r\n" + bioToServer);
@@ -771,29 +727,6 @@ void RLHTRequestThermo(int address, float* t1, float* t2)
   *t1 = thermo1.number;
   *t2 = thermo2.number;
 }
-void RLHTCommandAuto(int address, byte heater,  float heatsetpoint, float setKp, byte thermocouple, bool enableReverse){
-  FLOATUNION_t setpoint;
-  FLOATUNION_t Kp;
-  setpoint.number = heatsetpoint;
-  Kp.number = setKp; 
-  Wire.beginTransmission(address);
-  Serial.println("wrote a dude");
-  Wire.write('A');
-  Wire.write(heater);
-  for(int i=0; i<4; i++){
-    Wire.write(setpoint.bytes[i]);              // sends one byte
-  }
-  for(int i=0;i<4;i++){
-    Wire.write(Kp.bytes[i]);
-  }
-
-  Wire.write(thermocouple);
-  Wire.write(enableReverse);
-  Wire.endTransmission();    // stop transmitting
-  Serial.println("unwrote a dude");
-  
-
-}
 
 void RLHTCommandSetpoint(int address, byte heater, float heatSetpoint, byte thermocouple, bool enableReverse)
 {
@@ -829,54 +762,22 @@ void RLHTCommandSetpoint(int address, byte heater, float heatSetpoint, byte ther
  */
 void RLHTCommandPIDAuto(int address, byte heater, float Ku,float setpoint, float temp, double time)
 {
-  float tmp = bio_post_heater_pid[1][1];
-  Serial.print("Current Kp: ");
-  Serial.println(tmp);
-  Serial.print("time");
-  Serial.println(time);
-  Serial.println("temp: ");
-  Serial.println(temp);
-  Serial.print("setpoint: ");
-  Serial.println(setpoint);
-  Serial.println("temp bio: ");
-  for (int i = 0; i < 4; i++)
-    {
-      Serial.print(bio_thermo_val[i]);
-      Serial.print(" ");
-    }
-  Serial.println();
-  if(bio_post_heater_auto[2] == 0 && autoCheck == 1)
-  {
-    Serial.println("Time set");
-    bio_post_heater_auto[2] = time;
-  }
+
+
 //we could just increase the gain super slowly
-  if (autoCheck == 1 && time - bio_post_heater_auto[2] > 20)
+  if (autoCheck == 1)
   {
     //((current T - previous T) / (current time - previous timee))
     double driv = (temp - bio_post_heater_auto[1])/(time - bio_post_heater_auto[2]);
-    
-    Serial.print("currentTemp: ");
-    Serial.println(temp);
-    Serial.print("Deriv: ");
-    Serial.println(driv);
-    Serial.print("prevDeriv: ");
-    Serial.println(bio_post_heater_auto[4]);
-    Serial.print("setpoint: ");
-    Serial.println(setpoint);
-    Serial.print("Max Temp: ");
-    Serial.println(bio_post_heater_auto[0]);
-    
     //if T is less than 2% of Setpoint and the derivative is decreasing and it isn't oscillating...
-    if ((temp < setpoint - (setpoint * 0.02)) && driv < 0.02 && checkOsc == 0)
+    if ((temp < setpoint - (setpoint * 0.02)) && driv - bio_post_heater_auto[4] < 0 && checkOsc == 0)
     {
         //double Ku and send new gains
-        bio_post_heater_pid[1][1] = Ku * 2;
-        RLHTCommandPID(address, heater, bio_post_heater_pid[1][1], 0, 0);
-        Serial.print("Kp Change: ");
-        Serial.println(bio_post_heater_pid[1][1]); 
+        Ku = Ku * 2;
+        RLHTCommandPID(address, heater, Ku, 0, 0);
+      
     }
-    else if(temp > setpoint || checkOsc == 1)
+    else
     {
       //check for oscillations
       checkOsc = 1;
@@ -893,45 +794,26 @@ void RLHTCommandPIDAuto(int address, byte heater, float Ku,float setpoint, float
       //If max observed T is larger than new and we have not found the first peak, set it as the first peak
       if(bio_post_heater_auto[0] > temp && peak == 0){
         bio_post_heater_auto[3] = bio_post_heater_auto[0];
-        bio_post_heater_auto[0] = 0;
         peak = 1;
-        Serial.println("first peak");
         timerRestart(timer);
-        bio_post_heater_auto[2] = 0;
-        Serial.println("time reset");
       }
       //If max observed T is larger than new and we have found the first peak...
       else if (bio_post_heater_auto[0] > temp && peak == 1){
         //Find the delta between the secondpeak-firstpeak
         float delp = bio_post_heater_auto[0]-bio_post_heater_auto[3];
-        Serial.print("peak 1 temp: ");
-        Serial.println(bio_post_heater_auto[3]);
-        Serial.print("delp: ");
-        Serial.println(delp);
         //If the delta is greater than 0, change Ku
         if(delp > 0){
-          bio_post_heater_pid[1][1] = (Ku / 1.5); //or Ku - (Ku/2)
-          RLHTCommandPID(address, heater,bio_post_heater_pid[1][1],0,0);
+          Ku = (Ku / 1.5); //or Ku - (Ku/2)
         }
         else{
           float time = timerReadSeconds(timer);
-          //reset Command
-          RLHTCommandPID(address, heater, 0, 0, 0);
-          //add values to
-          bio_heater_auto_pid_vals[0] = 0.6*bio_post_heater_pid[1][1];
-          bio_heater_auto_pid_vals[1] = (1.2*bio_post_heater_pid[1][1])/time;
-          bio_heater_auto_pid_vals[2] = 0.075*bio_post_heater_pid[1][1]*time;
+          RLHTCommandPID(address, heater, 0.6*Ku, (1.2*Ku)/time, 0.075*Ku*time);
           checkOsc = 0;
           autoCheck = 0;
           timerStop(timer);
-          bio_post_heater_auto[2] = 0;
-          Serial.println("hit");
         }
       }
     }
-    // if(bio_post_heater_auto[2] != 0){
-    //   bio_post_heater_auto[2] = time;
-    // }
     //saving old time, temp, and dericative
     bio_post_heater_auto[1] = temp;
     bio_post_heater_auto[2] = time;
@@ -1022,8 +904,8 @@ void DCMTRequestPressure(int address, float* pressure)
   }
 
   if(data_received){
-    for(int x=8;x<12;x++){
-      press.bytes[x] = in_data[x];
+    for(int x=0;x<4;x++){
+      press.bytes[x] = in_data[x+8];
     }
   }
 

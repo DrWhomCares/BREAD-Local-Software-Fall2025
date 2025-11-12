@@ -25,7 +25,7 @@ ESP32Time rtc;
 
 #define SLICE_DATA_INTERVAL_MS 10000
 
-#define NUM_DCMT_SLICES   8
+#define NUM_DCMT_SLICES   9
 #define NUM_RLHT_SLICES   8
 #define NUM_PHDO_SLICES   2
 
@@ -145,6 +145,9 @@ int bio_ph[2][2] = {      // bioreactor pH layout {PHDO address, DCMT address}
 };
 float bio_ph_val[2][5];   // bioreactor pH settings (pH, Setpoint, Kp, Ki, Kd)
 
+int bio_pressure = 28;  // Address of DCMT with pressure sensor
+float bio_pressure_val = 0;  // Current pressure value
+
 int bio_do[2] = {97, 99}; // bioreactor DO addresses
 float bio_do_val[2] = {0,0};      // bioreactor DO values
 
@@ -190,7 +193,7 @@ bool logging = false; //logging data to SD card and graphs
 void initSlices(){
   // DCMT Slice address assignment
   for(int i=0;i<NUM_DCMT_SLICES;i++){
-    DCMT[i].address = 20+i;   // addresses 20-26
+    DCMT[i].address = 20+i;   // addresses 20-28
   }
   // RLHT Slice address assignment
   for(int i=0;i<NUM_RLHT_SLICES;i++){
@@ -439,6 +442,7 @@ Chem Decon Commands:
             break;
         }
       }
+      request->send(200, "text/plain", "OK");
     }
   });
 
@@ -548,7 +552,7 @@ Chem Decon Commands:
     } else if(request->url() == "/delete-pyrolysis") {
       writeFile(SD, "/pyrolysis-data.csv", "Date and Time,Dissolution Tank,Dissolution Heating Tape,Valve,Char Chamber,Secondary Reactor,Knockout Drum,Condenser 0,Condenser 1,Condenser 2");
     } else if(request->url() == "/delete-bioreactor") {
-      writeFile(SD, "/bioreactor-data.csv", "Date and Time,Thermocouple 1,pH Sensor 1,Dissolved Oxygen 1,Turbidity 1,Thermocouple 2, pH Sensor 2, Dissolved Oxygen 2,Turbidity 2,Pasteurization,Dryer");
+      writeFile(SD, "/bioreactor-data.csv", "Date and Time,Thermocouple 1,pH Sensor 1,Dissolved Oxygen 1,Turbidity 1,Thermocouple 2, pH Sensor 2, Dissolved Oxygen 2,Turbidity 2,Pasteurization,Dryer,Pressure");
     } else if(request->url() == "/delete-chemreactor") {
       writeFile(SD, "/chemreactor-data.csv", "Date and Time,Reactor 1,Reactor 2");
     }
@@ -600,7 +604,7 @@ void loop() {
     for(uint8_t n = 0; n < 2; n++) {
       if(readRequestedPHDO) bio_ph_val[n][0] = PHDORequest(bio_ph[n][0]);
       if(readRequestedPHDO) bio_do_val[n] = PHDORequest(bio_do[n]);
-      DCMTRequestTurbidity(bio_turbidity[n][0], &(bio_turbidity_val[0]), &(bio_turbidity_val[1]));
+	  DCMTRequestTurbidity(bio_turbidity[n][0], &(bio_turbidity_val[0]), &(bio_turbidity_val[1]));
 
       // update pH pump controller with new pH values if setpoint is nonzero
       if(bio_ph_val[n][1] != 0)
@@ -612,6 +616,7 @@ void loop() {
       if(bio_thermo[n][1] == 2)
         RLHTRequestThermo(bio_thermo[n][0], &(temp), &(bio_thermo_val[n]));
     }
+    DCMTRequestPressure(bio_pressure, &bio_pressure_val);
     for(int i=0;i<2;i++){
       float temp;
       //if thermocouple 1?
@@ -653,7 +658,7 @@ void loop() {
     for(uint8_t n = 0; n < 2; n++) {
       bioToServer += "," + String(bio_thermo_val[n]) + "," + String(bio_ph_val[n][0]) + "," + String(bio_do_val[n]) + "," + String(bio_turbidity_val[n]);
     }
-    bioToServer += "," + String(bio_thermo_val[2]) + "," + String(bio_thermo_val[3]);
+    bioToServer += "," + String(bio_thermo_val[2]) + "," + String(bio_thermo_val[3]) + "," + String(bio_pressure_val);
     for(uint8_t n = 0; n < 2; n++) {
       chemToServer += "," + String(chem_thermo_val[n]);
     }
@@ -859,7 +864,7 @@ void DCMTRequestTurbidity(int address, float* turbidity1, float* turbidity2)
   turb1.number = 0;
   turb2.number = 0;
   
-  Wire.requestFrom(address, 10, 1);
+  Wire.requestFrom(address, 12, 1);
   int i=0;
   while (Wire.available()) {                 //are there bytes to receive.
     data_received = true;
@@ -877,6 +882,34 @@ void DCMTRequestTurbidity(int address, float* turbidity1, float* turbidity2)
 
   *turbidity1 = turb1.number;
   *turbidity2 = turb2.number;
+}
+
+void DCMTRequestPressure(int address, float* pressure)
+{
+  bool data_received = false;
+  byte in_char;
+  char in_data[20];
+  FLOATUNION_t press;
+
+  press.number = 0;
+  
+  Wire.requestFrom(address, 12, 1);
+
+  int i=0;
+  while (Wire.available()) {
+    data_received = true;
+    in_char = Wire.read();
+    in_data[i] = in_char;
+    i++;
+  }
+
+  if(data_received){
+    for(int x=8;x<12;x++){
+      press.bytes[x] = in_data[x];
+    }
+  }
+
+  *pressure = press.number;
 }
 
 void DCMTCommandTurbidity(int address, byte motor, byte direction, bool enable, int sample_period)

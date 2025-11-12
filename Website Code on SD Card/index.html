@@ -557,41 +557,6 @@
                     <button id="bio-pro-tracking" onclick="setTracking('bio-pro-tracking', 'bio-pro-tracking-amount', 'bio-pro-graph')">Track Data</button>        
                 </div>
             </div>
-            <!-- === Bioreactor: Pressure section (auto-added) === -->
-            <hr>
-            <h3>Bioreactor — Pressure</h3>
-
-            <div id="bio-pressures" style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; margin-bottom:16px">
-            <div class="bio-pressure-gauge-wrap">
-                <div id="bio-pressure1-gauge" style="width:260px; min-height:220px"></div>
-                <div style="margin-top:6px">
-                <label>Setpoint 1 (psi):</label>
-                <input type="number" id="bio-pr1-set" step="0.1" value="15" style="width:100px">
-                </div>
-            </div>
-
-            <div class="bio-pressure-gauge-wrap">
-                <div id="bio-pressure2-gauge" style="width:260px; min-height:220px"></div>
-                <div style="margin-top:6px">
-                <label>Setpoint 2 (psi):</label>
-                <input type="number" id="bio-pr2-set" step="0.1" value="15" style="width:100px">
-                </div>
-            </div>
-
-            <div style="flex:1; min-width:520px">
-                <div id="bio-pressures-graph" style="height:340px"></div>
-                <div style="margin-top:6px">
-                <label>Track previous seconds:</label>
-                <input type="number" id="bio-pressures-track-seconds" value="60">
-                <button id="bio-pressures-track-btn"
-                        onclick="setTracking('bio-pressures-track-btn','bio-pressures-track-seconds','bio-pressures-graph')">
-                    Track Data
-                </button>
-                </div>
-            </div>
-            </div>
-            <!-- === /Bioreactor: Pressure section === -->
-                        
         </div>
 
         <div id="chemreactor"class="tabcontent">
@@ -818,6 +783,7 @@
 					<div style="display: flex; flex-direction: column; align-items: center;">
 						<div id="seq-prac-pressure"></div>
 						<p style="margin: 5px 0;"><strong>System Pressure</strong></p>
+						
 					</div>
 					<div style="display: flex; flex-direction: column; align-items: center;">
 						<div id="seq-prac-stirring2"></div>
@@ -1576,7 +1542,7 @@
         "bio-pro-gauge2": {
             title: "Dryer",
             value: 0,
-        },
+        }
     }
     var motorGaugeInfo = {
         "bio-stirring-gauge1": {
@@ -1621,18 +1587,22 @@
         "chem-pump4-gauge1": {
             title: "Reactor Wash"
         },
-	"seq-test-input-pump": {
-		title: "Water Pump"
-	},
-	"seq-test-stirring2": {
-		title: "Stirring Motor 2"
-	},
-	"seq-test-output-pump": {
-		title: "Harvest Pump"
-	},
-	"seq-prac-stirring2": {
-		title: "Stirring Motor 2"
-	}
+		"seq-test-input-pump": {
+			title: "Water Pump"
+		},
+		"seq-test-stirring2": {
+			title: "Stirring Motor 2"
+		},
+		"seq-test-output-pump": {
+			title: "Harvest Pump"
+		},
+		"seq-prac-stirring2": {
+			title: "Stirring Motor 2"
+		},
+		"seq-prac-pressure": { 
+			title: "System Pressure (PSI)",
+            value: 0,
+        },
     }
     //create new gauge plots
     Plotly.newPlot('bio-thermo-gauge1', thermo_bio_gauge, gaugeLayout);
@@ -1738,7 +1708,7 @@
 	Plotly.newPlot("seq-prac-acid-pump1", motor_gauge, gaugeLayout);
 	Plotly.newPlot("seq-prac-water-pump", motor_gauge, gaugeLayout);
 	Plotly.newPlot("seq-prac-harvest-pump", motor_gauge, gaugeLayout);
-	Plotly.newPlot('seq-prac-pressure', pressure_gauge, gaugeLayout);
+	Plotly.newPlot("seq-prac-pressure", pressure_gauge, gaugeLayout);
 
 	// Set titles
 	Plotly.restyle('seq-prac-thermo1', {title: "Thermocouple 1"});
@@ -1750,7 +1720,7 @@
 	Plotly.restyle("seq-prac-acid-pump1", {title: "Acid Pump 1"});
 	Plotly.restyle("seq-prac-water-pump", {title: "Water Pump"});
 	Plotly.restyle("seq-prac-harvest-pump", {title: "Harvest Pump"});
-	Plotly.restyle('seq-prac-pressure', {title: "System Pressure (PSI)"});
+	Plotly.restyle("seq-prac-pressure", {title: bioGaugeInfo["seq-prac-pressure"].title});
 
 	//----------------Sequencing Control Variables-----------------------//
 	var testSequenceActive = false;
@@ -2232,11 +2202,6 @@
 
         source.addEventListener('bioreactor-readings', function(e) {
             var bioVals = e.data.split(',')
-            // Assuming payload indices P1=bioVals[11], P2=bioVals[12] and time=bioVals[0]
-            if (typeof updateBioPressureGauges === 'function') {
-            updateBioPressureGauges(bioVals[0], bioVals[11], bioVals[12]);
-            }
-
 
             bioGaugeInfo["bio-thermo-gauge1"].value = bioVals[1]
             bioGaugeInfo["bio-ph-gauge1"].value = bioVals[2]
@@ -2251,8 +2216,8 @@
 			if(bioVals[11] !== undefined) {
 				let pressureValue = parseFloat(bioVals[11]);
 				if(!isNaN(pressureValue)) {
-					Plotly.update('seq-prac-pressure', {
-						value: parseFloat(bioVals[11]), 
+					Plotly.update("seq-prac-pressure", {
+						value: parseFloat(bioVals[16]), 
 						title: "System Pressure (PSI)", 
 						'gauge.bar.color': "blue",
 					});
@@ -2609,181 +2574,31 @@
     }
 
     </script>
-        <script>
-        // ===== Bioreactor pressure gauges + graph =====
-        // Uses your existing Plotly + gaugeLayout (same as other indicators)
+	
+	<script>
+	document.addEventListener("DOMContentLoaded", function() {
+		const evtSource = new EventSource("/events");
 
-        window.__bioPressure__ = window.__bioPressure__ || {
-        p1: 0,
-        p2: 0,
-        min: 0,     // gauge/graph min psi
-        max: 60     // gauge/graph max psi (change here for a different default scale)
-        };
+		evtSource.addEventListener("bioreactor-readings", function(event) {
+			const data = event.data.split(",");
+			// Format: DateTime,Thermo1,pH1,DO1,Turb1,Thermo2,pH2,DO2,Turb2,Past,Dry,Pressure
 
-        // Two traces for the graph
-        var bio_pressure_traces = [
-        { y: [], x: [], type: 'scatter', mode: 'lines', name: 'Pressure 1 (psi)' },
-        { y: [], x: [], type: 'scatter', mode: 'lines', name: 'Pressure 2 (psi)' }
-        ];
-
-        var bio_pressure_layout = {
-        title: 'Bioreactor Pressure',
-        xaxis: { title: 'Time', autorange: true, type: 'date' },
-        yaxis: { title: 'Pressure (psi)', rangemode: 'tozero' },
-        showlegend: true
-        };
-
-        // Base indicator config; we clone for each gauge
-        function makePressureGauge(title, min, max, setpoint) {
-        return [{
-            domain: { x: [0, 1], y: [0, 1] },
-            value: 0,
-            title: { text: title },
-            type: 'indicator',
-            mode: 'gauge+number',
-            number: { valueformat: '.2f' },
-            gauge: {
-            axis: { range: [min, max] },
-            bar: { color: 'green' },
-            steps: [{ range: [min, max], color: '#dddddd' }],
-            threshold: { line: { color: 'red', width: 4 }, thickness: 0.75, value: setpoint }
-            }
-        }];
-        }
-
-        function ensureBioPressuresUI() {
-        var min = window.__bioPressure__.min;
-        var max = window.__bioPressure__.max;
-
-        if (document.getElementById('bio-pressure1-gauge') && !document.getElementById('bio-pressure1-gauge').dataset.ready) {
-            Plotly.newPlot('bio-pressure1-gauge',
-            makePressureGauge('Pressure 1', min, max, parseFloat(document.getElementById('bio-pr1-set')?.value || 15)),
-            gaugeLayout
-            );
-            document.getElementById('bio-pressure1-gauge').dataset.ready = '1';
-        }
-        if (document.getElementById('bio-pressure2-gauge') && !document.getElementById('bio-pressure2-gauge').dataset.ready) {
-            Plotly.newPlot('bio-pressure2-gauge',
-            makePressureGauge('Pressure 2', min, max, parseFloat(document.getElementById('bio-pr2-set')?.value || 15)),
-            gaugeLayout
-            );
-            document.getElementById('bio-pressure2-gauge').dataset.ready = '1';
-        }
-        if (document.getElementById('bio-pressures-graph') && !document.getElementById('bio-pressures-graph').dataset.ready) {
-            Plotly.newPlot('bio-pressures-graph', bio_pressure_traces, bio_pressure_layout, { scrollZoom: true });
-            document.getElementById('bio-pressures-graph').dataset.ready = '1';
-        }
-        }
-
-        // Call on load (and/or when switching to the Bioreactor tab)
-        window.addEventListener('load', ensureBioPressuresUI);
-        
-        
-        // Ensure pressure UI exists and resizes when the Bioreactor tab is shown
-        (function patchOpenPage(){
-            if (!window.openPage) return;           // tabbing.js defines openPage
-            const _openPage = window.openPage;
-            window.openPage = function(pageName, elmnt, color){
-            const r = _openPage.apply(this, arguments);
-            if (pageName === 'bioreactor') {
-                // create gauges/graph if not created yet
-                if (typeof ensureBioPressuresUI === 'function') ensureBioPressuresUI();
-                // nudge Plotly to size correctly now that the tab is visible
-                if (document.getElementById('bio-pressures-graph')) {
-                Plotly.Plots.resize('bio-pressures-graph');
-                }
-                if (document.getElementById('bio-pressure1-gauge')) {
-                Plotly.Plots.resize('bio-pressure1-gauge');
-                }
-                if (document.getElementById('bio-pressure2-gauge')) {
-                Plotly.Plots.resize('bio-pressure2-gauge');
-                }
-            }
-            return r;
-            };
-        })();
-            // Update both gauges, and stream to graph if logging is on
-            function updateBioPressureGauges(timestampISO, p1, p2) {
-                // (keep your existing code)
-            }
-
-            function setBioPressureScale(min, max) {
-                // (keep your existing code)
-            }
-
-        </script>
+			if (data.length >= 17) {
+				const pressure = parseFloat(data[16]);  // last field
+				if (!isNaN(pressure)) {
+					// Update the sequencing tab gauge
+					console.warn("bioreactor-readings:", data);
+					setGaugeValue(pressure, "seq-prac-pressure");
+				} else {
+					console.warn("Pressure value not parsed correctly:", data);
+				}
+			} else {
+				console.warn("bioreactor-readings event missing fields:", data);
+			}
+		});
+	});
+	</script>
 
 
-
-        
-        // Update both gauges, and stream to graph if logging is on
-        function updateBioPressureGauges(timestampISO, p1, p2) {
-        window.__bioPressure__.p1 = parseFloat(p1) || 0;
-        window.__bioPressure__.p2 = parseFloat(p2) || 0;
-
-        // Color by setpoint (±25% band)
-        var sp1 = parseFloat(document.getElementById('bio-pr1-set')?.value || 0);
-        var sp2 = parseFloat(document.getElementById('bio-pr2-set')?.value || 0);
-        function colorFor(val, sp) {
-            if (!sp) return 'green';
-            if (val < sp * 0.75) return 'yellow';
-            if (val > sp * 1.25) return 'red';
-            return 'green';
-        }
-
-        Plotly.restyle('bio-pressure1-gauge', {
-            value: [window.__bioPressure__.p1],
-            gauge: [{
-            axis: { range: [window.__bioPressure__.min, window.__bioPressure__.max] },
-            bar: { color: colorFor(window.__bioPressure__.p1, sp1) },
-            steps: [{ range: [window.__bioPressure__.min, window.__bioPressure__.max], color: '#dddddd' }],
-            threshold: { line: { color: 'red', width: 4 }, thickness: 0.75, value: sp1 }
-            }]
-        });
-
-        Plotly.restyle('bio-pressure2-gauge', {
-            value: [window.__bioPressure__.p2],
-            gauge: [{
-            axis: { range: [window.__bioPressure__.min, window.__bioPressure__.max] },
-            bar: { color: colorFor(window.__bioPressure__.p2, sp2) },
-            steps: [{ range: [window.__bioPressure__.min, window.__bioPressure__.max], color: '#dddddd' }],
-            threshold: { line: { color: 'red', width: 4 }, thickness: 0.75, value: sp2 }
-            }]
-        });
-
-        if (typeof logging !== 'undefined' && logging) {
-            Plotly.extendTraces('bio-pressures-graph', {
-            x: [[timestampISO],[timestampISO]],
-            y: [[window.__bioPressure__.p1],[window.__bioPressure__.p2]]
-            }, [0,1]);
-
-            if (document.getElementById('bio-pressures-track-btn') &&
-                document.getElementById('bio-pressures-track-btn').textContent === 'Tracking Data...') {
-            trackData(document.getElementById('bio-pressures-track-seconds').value, 'bio-pressures-graph');
-            }
-        }
-        }
-
-        // Optional: change gauge & graph scale from anywhere
-        function setBioPressureScale(min, max) {
-        min = (typeof min === 'number') ? min : 0;
-        max = (typeof max === 'number') ? max : 60;
-        window.__bioPressure__.min = min;
-        window.__bioPressure__.max = max;
-        Plotly.restyle('bio-pressure1-gauge', { gauge: [{ axis: { range: [min, max] }, steps: [{ range: [min, max], color: '#dddddd' }] }] });
-        Plotly.restyle('bio-pressure2-gauge', { gauge: [{ axis: { range: [min, max] }, steps: [{ range: [min, max], color: '#dddddd' }] }] });
-        Plotly.relayout('bio-pressures-graph', { 'yaxis.range': [min, max] });
-        }
-
-        // === SSE wiring example (put inside your existing EventSource) ===
-        // source.addEventListener('bioreactor-readings', function(e) {
-        //   const vals = e.data.split(',');     // e.g., [timeISO, T1, pH1, DO1, Turb1, T2, pH2, DO2, Turb2, Pasteur, Dryer, P1, P2]
-        //   const timestampISO = vals[0];
-        //   const pressure1 = vals[11];         // adjust indexes to match your payload
-        //   const pressure2 = vals[12];
-        //   updateBioPressureGauges(timestampISO, pressure1, pressure2);
-        // }, false);
-        </script>
-    
     </body>
 </html>

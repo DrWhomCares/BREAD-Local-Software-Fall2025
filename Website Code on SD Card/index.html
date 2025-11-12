@@ -1720,7 +1720,7 @@
 	Plotly.restyle("seq-prac-acid-pump1", {title: "Acid Pump 1"});
 	Plotly.restyle("seq-prac-water-pump", {title: "Water Pump"});
 	Plotly.restyle("seq-prac-harvest-pump", {title: "Harvest Pump"});
-	Plotly.restyle("seq-prac-pressure", {title: bioGaugeInfo["seq-prac-pressure"].title});
+	Plotly.restyle("seq-prac-pressure", {title: "System Pressure (PSI)"});
 
 	//----------------Sequencing Control Variables-----------------------//
 	var testSequenceActive = false;
@@ -2587,7 +2587,7 @@
 				const pressure = parseFloat(data[16]);  // last field
 				if (!isNaN(pressure)) {
 					// Update the sequencing tab gauge
-					console.warn("bioreactor-readings:", data);
+					console.warn("Pressure value:", data);
 					setGaugeValue(pressure, "seq-prac-pressure");
 				} else {
 					console.warn("Pressure value not parsed correctly:", data);

@@ -223,6 +223,7 @@ void loop() {
     printOutput();
   }
 }
+
 void autoTune(){
   //float tmp = 10; not a real value  
   /*Serial.print("Current Kp: ");
@@ -236,8 +237,10 @@ void autoTune(){
   Serial.println("temp bio: ");
   */
   Serial.println("here");
-  double t_in = RLHT.thermo1; // default
-  if (RLHT.thermoSelect[0] == 2) t_in = RLHT.thermo2;
+  int sel = (RLHT.thermoSelect[0] == '2') ? 2 : (RLHT.thermoSelect[0] == 2 ? 2 : 1);
+  double t_in = (sel == 2) ? RLHT.thermo2 : RLHT.thermo1;
+
+  
 
   RLHT_auto.thermo1 = t_in;                  // for your derivative/peak logic
   RLHT.relay1Input  = t_in;                  // feed the PID input
@@ -246,6 +249,7 @@ void autoTune(){
   // make sure the PID uses the current (possibly adjusted) Kp during autotune
   relay1PID.SetTunings(RLHT_auto.Kp_1, 0, 0);
   // keep output window limits
+  relay1PID.SetSampleTime(THERMO_UPDATE_TIME_MS);
   relay1PID.SetOutputLimits(0, RLHT.rPeriod_1);
   // compute new on-time for the current window
   relay1PID.Compute();
@@ -254,6 +258,7 @@ void autoTune(){
   {
     bio_auto[2] = timer.time();
   }
+
   //we could just increase the gain super slowly
   if (autoCheck == 1 && timer.time() - bio_auto[2] > 20)
   {
@@ -344,6 +349,7 @@ void autoTune(){
           timer.stop();
           bio_auto[2] = 0;
           Serial.println("hit");
+          return;
         }
       }
     }

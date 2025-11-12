@@ -3,7 +3,7 @@
 #include <PID_v1.h>
 #include <math.h>
 
-#define I2C_ADR 19
+#define I2C_ADR 20
 
 #define ESTOP 2
 #define LED_PIN 5
